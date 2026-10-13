@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NodeSeek Issue Templates
 // @namespace    https://www.nodeseek.com/
-// @version      1.4.42
+// @version      1.4.44
 // @description  在 NodeSeek 发帖或编辑帖页面用表单生成交易帖，并回填 Markdown 编辑器。
 // @author       vico
 // @updateURL    https://github.com/ruoqianfengshao/nodeseek-issue-template/releases/latest/download/NodeSeek.Issue.Templates.min.user.js
@@ -21,7 +21,7 @@
   'use strict';
 
 const APP_ID = 'nsit-app';
-  const VERSION = '1.4.41';
+  const VERSION = '1.4.43';
   const NODEIMAGE_KEY = 'nsit-nodeimage-api-key';
   const RUNTIME_KEY = '__nodeSeekIssueTemplatesRuntime__';
   const STORAGE_KEY = 'nsit-single-server-draft-v1';
@@ -55,10 +55,24 @@ const APP_ID = 'nsit-app';
   ];
   const DEFAULT_RENEWAL_FIELDS = RENEWAL_FIELD_OPTIONS.map(([name]) => name);
   const MACHINE_FIELDS = ['vendor', 'model', 'cpu', 'memory', 'disk', 'bandwidth', 'traffic', 'remainingTraffic', 'renewalCycle', 'renewalAmount', 'currency', 'expiryDate', 'tradeDate', 'nqUrl', 'tqUrl', 'askingPrice', 'askingPremium', 'remarks'];
+  // 表单里没有填值时的默认项：新增单机、打开草稿、套用配置库记录都会走这里。
+  const MACHINE_FIELD_DEFAULTS = { currency: 'USD 美元', renewalCycle: '月付' };
   const RATE_CACHE_KEY = 'nsit-cny-rates-v1';
+  const RATE_TABLE_KEY = 'nsit-rate-table-v1';
   const MACHINE_CATALOG_API_URL = 'https://nsit-machine-catalog.ruoqianfengshao.workers.dev';
   const MACHINE_CATALOG_FIELDS = ['vendor', 'model', 'cpu', 'memory', 'disk', 'bandwidth', 'traffic', 'renewalCycle', 'renewalAmount', 'currency'];
   const CURRENCY_CODES = { 'CNY 人民币': 'CNY', 'USD 美元': 'USD', 'EUR 欧元': 'EUR', 'GBP 英镑': 'GBP', 'JPY 日元': 'JPY', 'KRW 韩元': 'KRW', 'AUD 澳元': 'AUD', 'HKD 港元': 'HKD', 'TWD 新台币': 'TWD', 'CAD 加拿大元': 'CAD', 'SGD 新加坡元': 'SGD' };
+  // 计算器可换算的币种：比主表单宽，覆盖常见交易地区；全部在 open.er-api 的汇率表里。
+  const CALC_CURRENCIES = {
+    'CNY 人民币': 'CNY', 'USD 美元': 'USD', 'EUR 欧元': 'EUR', 'GBP 英镑': 'GBP',
+    'JPY 日元': 'JPY', 'KRW 韩元': 'KRW', 'HKD 港元': 'HKD', 'TWD 新台币': 'TWD',
+    'MOP 澳门元': 'MOP', 'SGD 新加坡元': 'SGD', 'MYR 马来西亚林吉特': 'MYR', 'THB 泰铢': 'THB',
+    'PHP 菲律宾比索': 'PHP', 'VND 越南盾': 'VND', 'IDR 印尼盾': 'IDR', 'INR 印度卢比': 'INR',
+    'AUD 澳元': 'AUD', 'NZD 新西兰元': 'NZD', 'CAD 加拿大元': 'CAD', 'CHF 瑞士法郎': 'CHF',
+    'SEK 瑞典克朗': 'SEK', 'NOK 挪威克朗': 'NOK', 'DKK 丹麦克朗': 'DKK', 'PLN 波兰兹罗提': 'PLN',
+    'CZK 捷克克朗': 'CZK', 'RUB 卢布': 'RUB', 'TRY 土耳其里拉': 'TRY', 'AED 迪拉姆': 'AED',
+    'SAR 里亚尔': 'SAR', 'BRL 巴西雷亚尔': 'BRL', 'MXN 墨西哥比索': 'MXN', 'ZAR 南非兰特': 'ZAR',
+  };
   const CYCLE_MONTHS = { '月付': 1, '季付': 3, '半年付': 6, '年付': 12, '两年付': 24, '三年付': 36, '五年付': 60 };
   const OPTIONS = {
     vendors: ['搬瓦工', 'DMIT', 'RackNerd', 'Vultr', 'CloudCone', 'BuyVM', 'Hetzner', 'Linode', 'DigitalOcean', 'Lightlayer', '狗妈咪', '奶爸', 'Vmiss', '阿里云', '腾讯云', '火山云', '华为云'],
@@ -205,7 +219,8 @@ function escapeHtml(value) {
       const isVendor = name === 'vendor';
       const values = OPTIONS[options].map((value) => `<span data-nsit-picker-option="true" data-value="${escapeHtml(value)}">${isVendor ? vendorIconMarkup(value) : ''}${escapeHtml(value)}</span>`).join('');
       const prefix = isVendor ? `<span class="nsit-vendor-input-icon" data-nsit-vendor-icon>${vendorIconMarkup('')}</span>` : '';
-      const input = `<span class="nsit-picker${isVendor ? ' nsit-vendor-picker' : ''}" data-picker-name="${safeName}">${prefix}<input name="${safeName}"${form}${hint}${required} data-nsit-picker-input="true" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"><button type="button" class="nsit-picker-toggle" aria-label="选择${label}" aria-expanded="false"><i></i></button><span class="nsit-picker-menu">${values}</span></span>`;
+      const preset = MACHINE_FIELD_DEFAULTS[name] ? ` value="${escapeHtml(MACHINE_FIELD_DEFAULTS[name])}"` : '';
+      const input = `<span class="nsit-picker${isVendor ? ' nsit-vendor-picker' : ''}" data-picker-name="${safeName}">${prefix}<input name="${safeName}"${form}${preset}${hint}${required} data-nsit-picker-input="true" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"><button type="button" class="nsit-picker-toggle" aria-label="选择${label}" aria-expanded="false"><i></i></button><span class="nsit-picker-menu">${values}</span></span>`;
       const labelMarkup = isVendor ? `<span class="nsit-vendor-label"><span>${fieldLabel(name, label)}</span>${machineCatalogTriggerMarkup()}</span>` : `<span>${fieldLabel(name, label)}</span>`;
       return `<label class="nsit-field nsit-field--${safeName}">${labelMarkup}${input}</label>`;
     }
@@ -268,6 +283,66 @@ function escapeHtml(value) {
 
   function machineTabsMarkup() {
     return '<aside class="nsit-machine-tabs" data-nsit-machine-tabs></aside>';
+  }
+
+  function calcCurrencyPickerMarkup(name, value) {
+    return `<span class="nsit-picker nsit-currency-picker" data-picker-name="${name}"><input name="${name}" value="${escapeHtml(value)}" readonly aria-label="币种" data-nsit-picker-input="true" role="combobox" aria-autocomplete="none" aria-expanded="false"><button type="button" class="nsit-picker-toggle" aria-label="选择币种" aria-expanded="false"><i></i></button><span class="nsit-picker-menu">${calcCurrencyOptions()}</span></span>`;
+  }
+
+  // 对照表默认给出的几个常用币种，第一行人民币、默认填 100；每行币种都能改，也能加行、删行。
+  const CALC_TARGET_DEFAULTS = ['CNY 人民币', 'USD 美元', 'EUR 欧元', 'CAD 加拿大元', 'HKD 港元'];
+  const CALC_DEFAULT_AMOUNT = '100';
+  const CALC_DEFAULT_CYCLE = '月付';
+
+  function calcCurrencyOptions() {
+    return Object.keys(CALC_CURRENCIES).map((label) => `<span data-nsit-picker-option="true" data-value="${escapeHtml(label)}">${escapeHtml(label)}</span>`).join('');
+  }
+
+  // 对照表的一行：行首删除按钮 + 币种 + 金额 + 该行实时汇率，四者同一行。
+  // 第一行是默认的人民币基准行，不给删除按钮，只留一格占位保持各列对齐。
+  function calcRemoveIcon() {
+    return '<svg viewBox="0 0 1024 1024" aria-hidden="true"><path d="M509.862 80.856c-247.424 0-448 200.576-448 448s200.576 448 448 448c247.423 0 447.999-200.576 447.999-448s-200.576-448-447.999-448z m274.357 722.358c-35.652 35.652-77.153 63.637-123.349 83.176-47.795 20.217-98.602 30.467-151.008 30.467s-103.213-10.25-151.009-30.467c-46.195-19.539-87.696-47.523-123.349-83.176s-63.637-77.152-83.176-123.349c-20.217-47.796-30.467-98.603-30.467-151.009s10.25-103.213 30.467-151.009c19.539-46.196 47.523-87.696 83.176-123.349s77.153-63.637 123.349-83.176c47.796-20.217 98.603-30.467 151.009-30.467s103.213 10.25 151.008 30.467c46.195 19.539 87.696 47.523 123.349 83.176 35.653 35.652 63.638 77.152 83.177 123.349 20.215 47.796 30.466 98.603 30.466 151.009s-10.251 103.213-30.466 151.009c-19.54 46.197-47.524 87.697-83.177 123.349z"/><path d="M714.29 498.856H305.433c-16.568 0-30 13.432-30 30s13.432 30 30 30H714.29c16.568 0 30-13.432 30-30s-13.432-30-30-30z"/></svg>';
+  }
+
+  function calcTargetRowMarkup(currency, { removable = true, amount = '' } = {}) {
+    const remove = removable
+      ? `<button type="button" class="nsit-calc-rate-remove" data-action="remove-calc-currency" aria-label="移除该币种" title="移除">${calcRemoveIcon()}</button>`
+      : '<span class="nsit-calc-rate-gap" aria-hidden="true"></span>';
+    return `<div class="nsit-calc-rate-row">${remove}<span class="nsit-picker nsit-currency-picker" data-picker-name="calcTargetCurrency"><input value="${escapeHtml(currency)}" readonly aria-label="币种" data-nsit-picker-input="true" data-nsit-calc-target-input="true" role="combobox" aria-autocomplete="none" aria-expanded="false"><button type="button" class="nsit-picker-toggle" aria-label="选择币种" aria-expanded="false"><i></i></button><span class="nsit-picker-menu">${calcCurrencyOptions()}</span></span><input class="nsit-calc-rate-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="金额" data-nsit-calc-amount${amount ? ` value="${escapeHtml(amount)}"` : ''}><small class="nsit-calc-rate-line" data-nsit-calc-rate-line></small></div>`;
+  }
+
+  function calcModalMarkup() {
+    const cycles = OPTIONS.renewalCycle.map((value) => `<span data-nsit-picker-option="true" data-value="${escapeHtml(value)}">${escapeHtml(value)}</span>`).join('');
+    const cycle = `<label class="nsit-field nsit-field--calcRenewalCycle"><span>续费周期</span><span class="nsit-picker" data-picker-name="calcRenewalCycle"><input name="calcRenewalCycle" value="${CALC_DEFAULT_CYCLE}" placeholder="输入或选择" autocomplete="off" aria-label="续费周期" data-nsit-picker-input="true" role="combobox" aria-autocomplete="list" aria-expanded="false"><button type="button" class="nsit-picker-toggle" aria-label="选择续费周期" aria-expanded="false"><i></i></button><span class="nsit-picker-menu">${cycles}</span></span></label>`;
+    return `
+      <div class="nsit-calc-modal" aria-hidden="true">
+        <section class="nsit-calc-dialog" role="dialog" aria-modal="true" aria-label="剩余价值计算">
+          <header class="nsit-calc-head">
+            <div class="nsit-calc-head-copy"><h3>剩余价值计算</h3><small>左右两块可分别回填到编辑器</small></div>
+            <button type="button" class="nsit-close" data-action="close-calc" aria-label="关闭剩余价值计算">×</button>
+          </header>
+          <div class="nsit-calc-body">
+            <section class="nsit-calc-panel" data-nsit-calc-panel="remaining">
+              <h4>剩余价值</h4>
+              <div class="nsit-value-card nsit-calc-value-card">
+                <div class="nsit-value-inputs nsit-value-row-one">${cycle}<label class="nsit-field"><span>到期日期</span><input name="calcExpiryDate" type="date"></label><label class="nsit-field"><span>交易日期</span><input name="calcTradeDate" type="date" value="${today()}"></label></div>
+                <div class="nsit-value-inputs nsit-value-row-two"><label class="nsit-field nsit-field--renewalAmount"><span>续费金额</span><span class="nsit-amount-input">${calcCurrencyPickerMarkup('calcCurrency', 'USD 美元')}<input name="calcRenewalAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></span></label><label class="nsit-field nsit-field--askingPremium"><span>预出溢价（人民币）</span><input name="calcAskingPremium" type="number" min="0" step="0.01" inputmode="decimal" placeholder="请输入溢价"></label><label class="nsit-field nsit-field--askingPrice"><span>预出总价（人民币）</span><input name="calcAskingPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="一口价"></label></div>
+                <div class="nsit-value-heading"><span>${remainingValueIcon()}剩余价值</span><span class="nsit-rate-value"><span>${exchangeRateIcon()}实时汇率：</span><strong data-nsit-calc-remaining-rate>汇率加载中…</strong><button type="button" data-action="refresh-calc-rate" title="刷新今日汇率">↻</button></span><span class="nsit-value-stats"><strong data-nsit-calc-remaining-days>剩余 ? 天</strong><strong data-nsit-calc-remaining-percent>周期占比 ?</strong><i class="nsit-calc-progress" hidden><i data-nsit-calc-remaining-progress></i></i></span></div>
+                <div class="nsit-value-result"><div class="nsit-value"><small>¥</small><span data-nsit-calc-remaining-amount>0.00</span></div><div class="nsit-price-preview" data-nsit-calc-price-preview>预出价格可留空</div></div>
+              </div>
+              <div class="nsit-calc-insert" data-nsit-calc-remaining-insert>—</div>
+            </section>
+            <section class="nsit-calc-panel" data-nsit-calc-panel="convert">
+              <div class="nsit-calc-panel-head"><h4>汇率计算</h4><button type="button" data-action="refresh-calc-rate" title="刷新今日汇率" aria-label="刷新今日汇率">↻</button></div>
+              <p class="nsit-calc-hint">在任意一行填金额，其他币种按这一行换算。</p>
+              <div class="nsit-calc-rates" data-nsit-calc-rates>${CALC_TARGET_DEFAULTS.map((currency, index) => calcTargetRowMarkup(currency, { removable: index > 0, amount: index === 0 ? CALC_DEFAULT_AMOUNT : '' })).join('')}</div>
+              <button type="button" class="nsit-calc-add" data-action="add-calc-currency">＋ 添加币种</button>
+              <div class="nsit-calc-insert" data-nsit-calc-convert-insert>—</div>
+            </section>
+          </div>
+          <footer class="nsit-calc-foot"><div class="nsit-calc-foot-cell"><button type="button" class="nsit-primary" data-action="fill-calc-remaining" disabled>回填剩余价值</button></div><div class="nsit-calc-foot-cell"><button type="button" class="nsit-primary" data-action="fill-calc-convert" disabled>回填对照表</button></div><div class="nsit-calc-status" data-nsit-calc-status role="status"></div></footer>
+        </section>
+      </div>`;
   }
 
   function inlineMachineCatalogMarkup() {
@@ -698,8 +773,12 @@ function escapeHtml(value) {
     injectStyles(`${styles}\n${modelSuggestionStyles}\n#${APP_ID} .nsit-buy-shell{--nsit-accent:var(--nsit-info)}#${APP_ID} .nsit-buy-shell .nsit-head{background:linear-gradient(110deg,var(--nsit-head-from-2),var(--nsit-info-soft))}#${APP_ID} .nsit-buy-shell .nsit-star-note a,#${APP_ID} .nsit-buy-shell .nsit-personalization-trigger{color:var(--nsit-info)}#${APP_ID} .nsit-buy-shell .nsit-personalization-trigger:hover{background:var(--nsit-info-soft);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-shell button:hover{border-color:var(--nsit-info);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-shell button.nsit-primary,#${APP_ID} .nsit-buy-shell button.nsit-primary:hover{border-color:var(--nsit-info);background:var(--nsit-info);color:var(--nsit-on-accent)}#${APP_ID} .nsit-buy-shell button.nsit-primary:hover{background:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-shell input:not([type="radio"]):focus,#${APP_ID} .nsit-buy-shell textarea:focus{border-color:var(--nsit-info);box-shadow:0 0 0 3px var(--nsit-info-ring)}#${APP_ID} .nsit-buy-personalization-modal{--nsit-accent:var(--nsit-info)}#${APP_ID} .nsit-buy-personalization-modal button:hover{border-color:var(--nsit-info);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-personalization-modal button.nsit-primary{border-color:var(--nsit-info);background:var(--nsit-info);color:var(--nsit-on-accent)}#${APP_ID} .nsit-buy-personalization-modal button.nsit-primary:hover{background:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-personalization-modal input:focus{border-color:var(--nsit-info);box-shadow:0 0 0 3px var(--nsit-info-ring)}#${APP_ID} .nsit-buy-personalization-modal .nsit-title-preview{border-color:var(--nsit-info-line-2);background:var(--nsit-info-soft);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-personalization-modal .nsit-tag--transfer input:checked+span{border-color:var(--nsit-tag-transfer-line);background:var(--nsit-tag-transfer-soft);color:var(--nsit-tag-transfer-ink)}#${APP_ID} .nsit-buy-price-option{justify-self:start;background:transparent!important;text-align:left}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked){background:transparent!important;color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-price{gap:5px}#${APP_ID} .nsit-buy-price-option input[type="radio"]{appearance:auto;width:15px;height:15px;border:initial;border-radius:initial;background:initial;accent-color:var(--nsit-info);box-shadow:none}#${APP_ID} .nsit-buy-price-option input[type="radio"]:checked{background:initial}#${APP_ID} .nsit-buy-price-option input[name^="buyPriceValue-"]{height:30px;border:0;border-bottom:1px solid var(--nsit-knob-off);border-radius:0;background:transparent;box-shadow:none;font-size:14px}#${APP_ID} .nsit-buy-price-option>span,#${APP_ID} .nsit-buy-price-option>em{display:flex;align-items:center;height:30px;line-height:30px}#${APP_ID} .nsit-buy-price-option input[name^="buyPriceValue-"]::placeholder{font-size:14px}#${APP_ID} .nsit-buy-price-option input[name^="buyPriceValue-"]:focus{border:0;border-bottom:1px solid var(--nsit-info);box-shadow:none}#${APP_ID} .nsit-buy-price-option input[type="radio"]:focus{outline:0;box-shadow:none}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked)>span,#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked)>em,#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked) input[name^="buyPriceValue-"]{color:var(--nsit-info-ink);background:transparent;box-shadow:none}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked) input[name^="buyPriceValue-"]{border:0;border-bottom:1px solid var(--nsit-info)}#${APP_ID} .nsit-buy-contact-grid{grid-template-columns:repeat(4,minmax(0,1fr))}#${APP_ID} .nsit-buy-tags-field{grid-column:span 3}#${APP_ID} .nsit-buy-catalog>label{margin:6px 0;padding:0 10px}#${APP_ID} .nsit-buy-contact-grid+.nsit-buy-grid{margin-top:10px}#${APP_ID} .nsit-buy-shell .nsit-actions{margin-left:auto}`);
     injectStyles(`.message-input .mde-toolbar>#${APP_ID} .nsit-trigger{align-self:center;flex:none;margin:0 4px 0 0;white-space:nowrap}.message-input .mde-toolbar>#${APP_ID} .nsit-trigger:first-child{margin-left:auto}`);
     injectStyles(`#${APP_ID} .nsit-tag--contact input:checked+span{border-color:var(--nsit-tag-contact-line);background:var(--nsit-tag-contact-soft);color:var(--nsit-tag-contact-ink)}`);
+    injectStyles(`#${APP_ID} .nsit-trigger.nsit-calc-trigger{border-color:var(--nsit-ok-line);background:var(--nsit-ok-soft);color:var(--nsit-ok-ink)}#${APP_ID} .nsit-trigger.nsit-calc-trigger:hover{border-color:var(--nsit-ok);background:var(--nsit-ok);color:var(--nsit-on-accent)}#${APP_ID} .nsit-calc-modal{display:none;position:fixed;z-index:2147483647;inset:0;overflow:auto;padding:28px 16px;background:var(--nsit-scrim)}#${APP_ID}.nsit-calc-open .nsit-calc-modal{display:grid;place-items:center}#${APP_ID} .nsit-calc-dialog{display:flex;flex-direction:column;width:min(1180px,100%);max-height:calc(100vh - 56px);border:1px solid var(--nsit-line);border-radius:12px;background:var(--nsit-surface);box-shadow:0 20px 60px var(--nsit-shadow-2);overflow:hidden}#${APP_ID} .nsit-calc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 18px;border-bottom:1px solid var(--nsit-line);background:linear-gradient(110deg,var(--nsit-head-from),var(--nsit-accent-soft))}#${APP_ID} .nsit-calc-head-copy{display:flex;align-items:baseline;gap:9px;min-width:0}#${APP_ID} .nsit-calc-head-copy h3{font-size:16px}#${APP_ID} .nsit-calc-head-copy small{color:var(--nsit-muted);font-size:12px;white-space:nowrap}#${APP_ID} .nsit-calc-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-height:0;overflow:auto}#${APP_ID} .nsit-calc-panel{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px 18px}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-panel h4{margin:0;color:var(--nsit-ink);font-size:15px}#${APP_ID} .nsit-calc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px}#${APP_ID} .nsit-calc-panel-head button{width:auto;height:auto;margin:0;padding:0;border:0;background:transparent;color:var(--nsit-ok-ink);font-size:16px;line-height:1;cursor:pointer}#${APP_ID} .nsit-calc-hint{margin:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-value-card{margin:0}#${APP_ID} .nsit-calc-value-card .nsit-value-row-two{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr)}#${APP_ID} .nsit-calc-value-card .nsit-value-heading{flex-wrap:wrap;gap:6px 10px}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>span:first-child{white-space:nowrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:3;width:100%;margin-right:0}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>.nsit-rate-value strong{font-size:12px}#${APP_ID} .nsit-calc-value-card .nsit-value-stats strong{font-size:13px}#${APP_ID} .nsit-calc-value-card .nsit-value{font-size:30px}#${APP_ID} .nsit-calc-value-card .nsit-value-result .nsit-price-preview{font-size:15px}#${APP_ID} .nsit-calc-value-card .nsit-price-preview b{font-size:24px}#${APP_ID} .nsit-calc-progress{display:block;flex:none;width:62px;height:6px;overflow:hidden;border-radius:999px;background:var(--nsit-progress-track)}#${APP_ID} .nsit-calc-progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nsit-progress-from),var(--nsit-progress-to));transition:width .15s ease}#${APP_ID} .nsit-calc-rates{display:grid;gap:10px}#${APP_ID} .nsit-calc-rate-row{display:grid;grid-template-columns:24px 132px 166px minmax(0,1fr);align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--nsit-raised)}#${APP_ID} .nsit-calc-rate-row .nsit-picker input{padding:6px 26px 6px 8px;font-size:13px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle{right:5px;width:16px;height:16px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle i{width:14px;height:14px;background-size:14px 14px}#${APP_ID} .nsit-calc-rate-row .nsit-calc-rate-amount{padding:6px 8px;text-align:right;font-size:15px;font-weight:650}#${APP_ID} .nsit-calc-rate-remove{display:grid;place-items:center;width:24px;height:24px;margin:0;padding:0;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--nsit-muted);cursor:pointer}#${APP_ID} .nsit-calc-rate-remove:hover{color:var(--nsit-danger)}#${APP_ID} .nsit-calc-rate-remove svg{width:20px;height:20px;fill:currentColor}#${APP_ID} .nsit-calc-rate-gap{display:block}#${APP_ID} .nsit-calc-rate-line{min-width:0;overflow:hidden;color:var(--nsit-muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap}#${APP_ID} .nsit-calc-add{border-style:dashed;color:var(--nsit-ok-ink)}#${APP_ID} .nsit-calc-insert{padding:8px 10px;border:1px dashed var(--nsit-line-strong);border-radius:8px;background:var(--nsit-sunken);color:var(--nsit-muted-2);font-size:13px;line-height:1.5;word-break:break-all}#${APP_ID} .nsit-calc-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-top:1px solid var(--nsit-line);background:var(--nsit-surface);box-shadow:0 -8px 18px var(--nsit-shadow-soft-6)}#${APP_ID} .nsit-calc-foot-cell{display:flex;justify-content:flex-end;padding:12px 18px}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-status{grid-column:1/-1;padding:0 18px;color:var(--nsit-muted);font-size:13px;text-align:right}#${APP_ID} .nsit-calc-status:empty{display:none}#${APP_ID} .nsit-calc-status:not(:empty){padding-bottom:12px}@media(max-width:1080px){#${APP_ID} .nsit-calc-body{grid-template-columns:1fr}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-top:1px solid var(--nsit-line);border-left:0}#${APP_ID} .nsit-calc-foot{grid-template-columns:1fr}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-top:1px solid var(--nsit-line);border-left:0}}`);
+    // 剩余价值的回填预览是多行文本，保留换行。
+    injectStyles(`#${APP_ID} .nsit-calc-insert{white-space:pre-wrap}`);
     app.innerHTML = `
       <button type="button" class="nsit-trigger" aria-haspopup="dialog">出🐔模板</button>
+      ${replyMode ? '<button type="button" class="nsit-trigger nsit-calc-trigger" aria-haspopup="dialog">剩余价值计算</button>' : ''}
       ${buyTemplateMarkup()}
       <div class="nsit-modal" aria-hidden="true">
       <div class="nsit-dialog-wrap">
@@ -736,6 +815,7 @@ function escapeHtml(value) {
       </div>
       <div class="nsit-personalization-modal" aria-hidden="true"><section class="nsit-personalization-dialog" role="dialog" aria-modal="true" aria-label="个性化配置"><header class="nsit-personalization-head"><div><h3>个性化配置</h3><small>仅保存到当前浏览器本地</small></div><button type="button" class="nsit-close" data-action="close-personalization" aria-label="关闭个性化配置">×</button></header><div data-nsit-personalization-body></div></section></div>
       <div class="nsit-buy-personalization-modal" aria-hidden="true"><section class="nsit-personalization-dialog" role="dialog" aria-modal="true" aria-label="收鸡个性化配置"><header class="nsit-personalization-head"><div><h3>收鸡个性化配置</h3><small>仅保存到当前浏览器本地</small></div><button type="button" class="nsit-close" data-action="close-buy-personalization" aria-label="关闭收鸡个性化配置">×</button></header><div data-nsit-buy-personalization-body></div></section></div>
+      ${replyMode ? calcModalMarkup() : ''}
       `;
     const personalizationIcon = app.querySelector('[data-action="open-personalization"] svg');
     if (personalizationIcon) personalizationIcon.innerHTML = '<path d="M512 42.666667c123.093333 0 241.962667 43.946667 330.24 123.434666C930.688 245.674667 981.333333 354.645333 981.333333 469.333333a256 256 0 0 1-256 256h-96a32.042667 32.042667 0 0 0-25.6 51.2l12.8 17.066667a117.418667 117.418667 0 0 1-32.213333 170.197333A117.333333 117.333333 0 0 1 522.666667 981.333333H512a469.333333 469.333333 0 1 1 0-938.666666z m0 85.333333a384 384 0 1 0 0 768h10.666667a32.042667 32.042667 0 0 0 25.6-51.2l-12.8-17.066667a117.418667 117.418667 0 0 1 32.213333-170.197333A117.333333 117.333333 0 0 1 629.333333 640H725.333333l8.448-0.213333A170.666667 170.666667 0 0 0 896 469.333333c0-89.002667-39.253333-175.36-110.848-239.829333C713.429333 164.906667 615.253333 128 512 128z m-234.666667 341.333333a64 64 0 1 1 0 128 64 64 0 0 1 0-128z m469.333334-85.333333a64 64 0 1 1 0 128 64 64 0 0 1 0-128z m-384-128a64 64 0 1 1 0 128 64 64 0 0 1 0-128z m213.333333-42.666667a64 64 0 1 1 0 128 64 64 0 0 1 0-128z" fill="currentColor"></path>';
@@ -1047,7 +1127,7 @@ function formValues(app) {
   function applyMachine(app, machine) {
     MACHINE_FIELDS.forEach((name) => {
       const control = app.querySelector(`[name="${CSS.escape(name)}"]`);
-      if (control) control.value = machine[name] || (name === 'currency' ? 'USD 美元' : '');
+      if (control) control.value = machine[name] || MACHINE_FIELD_DEFAULTS[name] || '';
     });
     app.querySelectorAll('[name="transferTags"]').forEach((control) => { control.checked = (machine.transferTags || []).includes(control.value); });
     renderPersonalization(app);
@@ -1274,15 +1354,61 @@ function formValues(app) {
     } catch (_) { /* 缓存失败时仍可使用当前汇率 */ }
   }
 
+  function cachedRate(app, code) {
+    return code ? app._nsitRates?.[code] || rateFromCache(code) : null;
+  }
+
+  function rememberRate(app, code, record) {
+    app._nsitRates = { ...(app._nsitRates || {}), [code]: record };
+    if (record?.table) app._nsitRateTable = record.table;
+    return record;
+  }
+
+  async function fetchRate(code) {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(code)}`);
+    const data = await response.json();
+    const rate = Number(data?.rates?.CNY);
+    if (!response.ok || !Number.isFinite(rate) || rate <= 0) throw new Error('invalid rate');
+    saveRateToCache(code, rate);
+    // 同一份响应就是一张完整汇率表（base 币种兑所有币种），存下来给计算器算任意币种的交叉汇率。
+    const table = { base: data.base_code || code, rates: data.rates, updatedAt: Date.now() };
+    saveRateTable(table);
+    return { rate, updatedAt: Date.now(), table };
+  }
+
+  function rateTableFromCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(RATE_TABLE_KEY) || 'null');
+      return cached?.rates && cached.updatedAt ? cached : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveRateTable(table) {
+    try { localStorage.setItem(RATE_TABLE_KEY, JSON.stringify(table)); } catch (_) { /* 缓存失败时仍可使用当前汇率 */ }
+  }
+
+  function rateTable(app) {
+    return app._nsitRateTable || rateTableFromCache();
+  }
+
+  // 交叉汇率与基准币种无关：任何一张表都能算 A→B = rate[B] / rate[A]。
+  function crossRate(table, from, to) {
+    if (!table || !from || !to) return null;
+    const fromRate = Number(table.rates[from]);
+    const toRate = Number(table.rates[to]);
+    if (!Number.isFinite(fromRate) || !Number.isFinite(toRate) || fromRate <= 0) return null;
+    return toRate / fromRate;
+  }
+
   function activeRate(app) {
     const code = currencyCode(formValues(app).currency);
-    if (!code) return null;
-    return app._nsitRates?.[code] || rateFromCache(code);
+    return cachedRate(app, code);
   }
 
   function rateForValues(app, values) {
-    const code = currencyCode(values.currency);
-    return code ? app._nsitRates?.[code] || rateFromCache(code) : null;
+    return cachedRate(app, currencyCode(values.currency));
   }
 
   function refreshRateDisplay(app, message = '') {
@@ -1314,18 +1440,240 @@ function formValues(app) {
     }
     refreshRateDisplay(app, '正在加载…');
     try {
-      const response = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(code)}`);
-      const data = await response.json();
-      const rate = Number(data?.rates?.CNY);
-      if (!response.ok || !Number.isFinite(rate) || rate <= 0) throw new Error('invalid rate');
-      const record = { rate, updatedAt: Date.now() };
-      app._nsitRates = { ...(app._nsitRates || {}), [code]: record };
-      saveRateToCache(code, rate);
+      rememberRate(app, code, await fetchRate(code));
       refreshRateDisplay(app);
     } catch (_) {
       refreshRateDisplay(app, '汇率加载失败');
     }
     refreshCard(app); refreshPricePreview(app); refreshTitle(app);
+  }
+
+  /* 剩余价值 / 汇率计算器 ------------------------------------------------------
+   * 回帖、私信里的轻量工具：左侧算剩余价值、右侧换算汇率，两块各自回填编辑器，
+   * 不复用出鸡模板表单，避免和主表单字段互相干扰。汇率与主表单共用一份缓存。
+   * ------------------------------------------------------------------------- */
+
+  function calcValues(app) {
+    const read = (name) => app.querySelector(`.nsit-calc-modal [name="${name}"]`)?.value.trim() || '';
+    return {
+      renewalAmount: read('calcRenewalAmount'),
+      currency: read('calcCurrency'),
+      renewalCycle: read('calcRenewalCycle'),
+      expiryDate: read('calcExpiryDate'),
+      tradeDate: read('calcTradeDate'),
+      askingPremium: read('calcAskingPremium'),
+      askingPrice: read('calcAskingPrice'),
+    };
+  }
+
+  function calcCurrencyCode(label) {
+    return CALC_CURRENCIES[label] || '';
+  }
+
+  function calcTargetInputs(app) {
+    return Array.from(app.querySelectorAll('.nsit-calc-modal [data-nsit-calc-target-input]'));
+  }
+
+  function calcAmountInputs(app) {
+    return Array.from(app.querySelectorAll('.nsit-calc-modal [data-nsit-calc-amount]'));
+  }
+
+  // 对照表是联动的：最后输入金额的那一行就是基准行，其他行按它换算。
+  function calcBaseIndex(app) {
+    const count = calcAmountInputs(app).length;
+    if (!count) return -1;
+    const index = Number.isInteger(app._nsitCalcBase) ? app._nsitCalcBase : 0;
+    return Math.min(Math.max(index, 0), count - 1);
+  }
+
+  function calcBaseCurrency(app) {
+    const index = calcBaseIndex(app);
+    return index < 0 ? '' : calcCurrencyCode(calcTargetInputs(app)[index]?.value || '');
+  }
+
+  function addCalcTarget(app) {
+    const container = app.querySelector('[data-nsit-calc-rates]');
+    if (!container) return;
+    const used = new Set(calcTargetInputs(app).map((input) => input.value));
+    const labels = Object.keys(CALC_CURRENCIES);
+    const base = calcBaseCurrency(app);
+    const next = labels.find((label) => !used.has(label) && label !== base) || labels.find((label) => !used.has(label)) || labels[0];
+    container.insertAdjacentHTML('beforeend', calcTargetRowMarkup(next));
+    refreshCalc(app);
+  }
+
+  function removeCalcTarget(app, button) {
+    const row = button?.closest('.nsit-calc-rate-row');
+    const inputs = calcTargetInputs(app);
+    if (!row || inputs.length <= 1) return;
+    const index = inputs.indexOf(row.querySelector('[data-nsit-calc-target-input]'));
+    row.remove();
+    // 删掉的是基准行时回到第一行，否则基准索引跟着前移。
+    if (app._nsitCalcBase === index) app._nsitCalcBase = 0;
+    else if (app._nsitCalcBase > index) app._nsitCalcBase -= 1;
+    refreshCalc(app);
+  }
+
+  function setCalcStatus(app, message) {
+    const target = app.querySelector('[data-nsit-calc-status]');
+    if (target) target.textContent = message;
+  }
+
+  async function fetchRateTable() {
+    const record = await fetchRate('USD');
+    if (!record.table) throw new Error('invalid rate table');
+    return record.table;
+  }
+
+  function ensureRateTable(app, force = false) {
+    const cached = rateTable(app);
+    if (!force && cached && Date.now() - cached.updatedAt < 3600000) {
+      app._nsitRateTable = cached;
+      refreshCalc(app);
+      return;
+    }
+    if (app._nsitCalcRatePending) return;
+    app._nsitCalcRatePending = true;
+    app._nsitCalcRateFailed = false;
+    fetchRateTable()
+      .then((table) => { app._nsitRateTable = table; })
+      .catch(() => { app._nsitCalcRateFailed = true; })
+      .finally(() => { app._nsitCalcRatePending = false; refreshCalc(app); });
+    refreshCalc(app);
+  }
+
+  function calcRateText(app, from, rate, to = 'CNY') {
+    if (!from) return '选择币种后加载';
+    if (Number.isFinite(rate)) return `1 ${from} = ${rate.toFixed(4)} ${to}`;
+    return app._nsitCalcRateFailed ? '汇率加载失败' : '汇率加载中…';
+  }
+
+  function calcRemainingState(app) {
+    const values = calcValues(app);
+    const code = calcCurrencyCode(values.currency);
+    const rate = crossRate(rateTable(app), code, 'CNY');
+    const result = values.renewalAmount ? calculation({ ...values }) : null;
+    return { values, code, rate, result, remaining: result && Number.isFinite(rate) ? result.value * rate : null };
+  }
+
+  // 回填文本照搬出鸡模板「续费与价值」那一段的结构；预出价格、溢价都可有可无。
+  function remainingValueText(state) {
+    const { values, code, rate, result, remaining } = state;
+    if (!result || !Number.isFinite(remaining)) return '';
+    const symbol = currencySymbol(values.currency);
+    const renewal = [
+      values.renewalAmount ? `${symbol}${formatAmount(values.renewalAmount)}（${values.currency}）` : '',
+      values.renewalCycle,
+    ].filter(Boolean).join(' / ');
+    const detail = code === 'CNY'
+      ? `（剩余 ${result.daysLeft} 天，${result.percentage.toFixed(1)}%）`
+      : ` = ${symbol}${result.value.toFixed(2)} × ${rate.toFixed(4)}（剩余 ${result.daysLeft} 天，${result.percentage.toFixed(1)}%）`;
+    const lines = [
+      renewal ? `- 续费金额 / 周期：${renewal}` : '',
+      values.expiryDate ? `- 到期日期：${values.expiryDate}` : '',
+      values.tradeDate ? `- 交易日期：${values.tradeDate}` : '',
+      `- 剩余价值：¥${remaining.toFixed(2)}${detail}`,
+    ].filter(Boolean);
+    const askingPrice = effectiveCalcAskingPrice(values, remaining);
+    if (Number.isFinite(askingPrice)) lines.push(`- 预出价格：¥${askingPrice.toFixed(2)}（${priceVerdict(askingPrice, parsePrice(values.askingPremium), remaining)}）`);
+    return `## 续费与价值\n${lines.join('\n')}`;
+  }
+
+  function refreshCalcRemaining(app, state) {
+    const { values, code, rate, result, remaining } = state;
+    const amount = app.querySelector('[data-nsit-calc-remaining-amount]');
+    const days = app.querySelector('[data-nsit-calc-remaining-days]');
+    const percent = app.querySelector('[data-nsit-calc-remaining-percent]');
+    const rateLine = app.querySelector('[data-nsit-calc-remaining-rate]');
+    const progressTrack = app.querySelector('.nsit-calc-progress');
+    const progress = app.querySelector('[data-nsit-calc-remaining-progress]');
+    const preview = app.querySelector('[data-nsit-calc-price-preview]');
+    const insert = app.querySelector('[data-nsit-calc-remaining-insert]');
+    const button = app.querySelector('[data-action="fill-calc-remaining"]');
+    if (rateLine) rateLine.textContent = calcRateText(app, code, rate);
+    if (amount) amount.textContent = Number.isFinite(remaining) ? remaining.toFixed(2) : '—';
+    if (days) days.textContent = result ? `剩余 ${result.daysLeft} 天` : '剩余 ? 天';
+    if (percent) percent.textContent = result ? `周期占比 ${result.percentage.toFixed(1)}%` : '周期占比 ?';
+    if (progress) progress.style.width = result ? `${result.percentage}%` : '0%';
+    if (progressTrack) progressTrack.hidden = !result;
+    if (preview) renderPricePreview(preview, effectiveCalcAskingPrice(values, remaining), parsePrice(values.askingPremium), remaining, '预出价格可留空');
+    const text = remainingValueText(state);
+    if (insert) insert.textContent = text || '—';
+    if (button) button.disabled = !text;
+  }
+
+  function effectiveCalcAskingPrice(values, remaining) {
+    const askingPrice = parsePrice(values.askingPrice);
+    if (Number.isFinite(askingPrice)) return askingPrice;
+    const premium = parsePrice(values.askingPremium);
+    return Number.isFinite(premium) && Number.isFinite(remaining) ? remaining + premium : NaN;
+  }
+
+  // 对照表：每行一个币种，任意一行填了金额就以它为准换算其他行。
+  function calcConvertRows(app) {
+    const table = rateTable(app);
+    const amounts = calcAmountInputs(app);
+    const codes = calcTargetInputs(app).map((input) => calcCurrencyCode(input.value));
+    const baseIndex = calcBaseIndex(app);
+    const baseCode = codes[baseIndex] || '';
+    const value = parsePrice(amounts[baseIndex]?.value);
+    const ready = Boolean(baseCode) && Number.isFinite(value);
+    return {
+      codes,
+      baseIndex,
+      baseCode,
+      amount: value,
+      ready,
+      rates: codes.map((code) => crossRate(table, baseCode, code)),
+    };
+  }
+
+  function refreshCalcConvert(app) {
+    const { codes, baseIndex, baseCode, amount, ready, rates } = calcConvertRows(app);
+    const rows = Array.from(app.querySelectorAll('.nsit-calc-modal .nsit-calc-rate-row'));
+    rows.forEach((row, index) => {
+      const rate = rates[index];
+      const input = row.querySelector('[data-nsit-calc-amount]');
+      const line = row.querySelector('[data-nsit-calc-rate-line]');
+      // 基准行保留用户输入，其他行只做展示，写值时不派发事件以免递归。
+      const value = index === baseIndex || !ready || !Number.isFinite(rate) ? (index === baseIndex ? input?.value : '') : (amount * rate).toFixed(2);
+      if (input && input.value !== value) input.value = value;
+      if (line) line.textContent = !codes[index] || !baseCode ? '' : index === baseIndex ? '基准' : calcRateText(app, baseCode, rate, codes[index]);
+    });
+    const insert = app.querySelector('[data-nsit-calc-convert-insert]');
+    const button = app.querySelector('[data-action="fill-calc-convert"]');
+    const text = ready ? calcConvertText({ codes, baseIndex, baseCode, amount, rates }) : '';
+    if (insert) insert.textContent = text || '—';
+    if (button) button.disabled = !text;
+  }
+
+  function calcConvertText({ codes, baseIndex, baseCode, amount, rates }) {
+    const parts = codes
+      .map((code, index) => (index !== baseIndex && code && Number.isFinite(rates[index]) ? `${(amount * rates[index]).toFixed(2)} ${code}` : ''))
+      .filter(Boolean);
+    return parts.length ? `${Number.isInteger(amount) ? amount : amount.toFixed(2)} ${baseCode} ≈ ${parts.join(' / ')}` : '';
+  }
+
+  function refreshCalc(app) {
+    if (!app.querySelector('.nsit-calc-modal')) return;
+    refreshCalcRemaining(app, calcRemainingState(app));
+    refreshCalcConvert(app);
+  }
+
+  function fillCalcRemaining(app) {
+    const text = remainingValueText(calcRemainingState(app));
+    if (!text) return;
+    // 回填成功就直接关掉弹窗；只有找不到编辑器这种异常才留在弹窗里提示。
+    if (insertEditorText(app, text)) closeCalcModal(app);
+    else setCalcStatus(app, '未找到 NodeSeek 正文编辑器，请刷新页面后重试。');
+  }
+
+  function fillCalcConvert(app) {
+    const state = calcConvertRows(app);
+    const text = state.ready ? calcConvertText(state) : '';
+    if (!text) return;
+    if (insertEditorText(app, text)) closeCalcModal(app);
+    else setCalcStatus(app, '未找到 NodeSeek 正文编辑器，请刷新页面后重试。');
   }
 
   function refreshCard(app) {
@@ -1388,8 +1736,8 @@ function formValues(app) {
     return Number(value).toFixed(2);
   }
 
-  function setPricePreview(app, state, html) {
-    const preview = app.querySelector('[data-nsit-price-preview]');
+  function setPricePreview(preview, state, html) {
+    if (!preview) return;
     if (preview.dataset.previewHtml === html && preview.dataset.priceState === state) return;
     preview.dataset.priceState = state;
     preview.dataset.previewHtml = html;
@@ -1400,40 +1748,44 @@ function formValues(app) {
     preview.append(content);
   }
 
-  function refreshPricePreview(app) {
-    const values = formValues(app);
-    const preview = app.querySelector('[data-nsit-price-preview]');
-    const premium = parsePrice(values.askingPremium);
-    const askingPrice = effectiveAskingPrice(values, activeRate(app));
-    const result = calculation(values);
-    const rate = activeRate(app);
+  // 剩余价值 + 预出价格的结论。出鸡模板和回帖/私信计算器共用这一套口径。
+  // emptyText 区分两处口径：出鸡模板要求填价格，计算器允许预出价格和溢价同时为空。
+  function renderPricePreview(preview, askingPrice, premium, remainingCny, emptyText = '填写预出价格或预出溢价后显示价格预览') {
     const symbol = '¥';
     if (!Number.isFinite(askingPrice) || askingPrice < 0) {
-      setPricePreview(app, 'neutral', '填写预出价格或预出溢价后显示价格预览');
+      setPricePreview(preview, 'neutral', emptyText);
       return;
     }
-    const remainingCny = result && rate ? result.value * rate.rate : null;
     if (Number.isFinite(premium)) {
-      if (!Number.isFinite(remainingCny) || remainingCny === 0) {
-        setPricePreview(app, 'premium', `<b>溢价 ${formatPrice(premium, symbol)}</b>`);
-      } else {
-        setPricePreview(app, 'premium', `<span>${formatPreviewOperand(premium)} + ${formatPreviewOperand(remainingCny)} =</span><b>总价 ${formatPrice(askingPrice, symbol)}</b>`);
-      }
+      if (!Number.isFinite(remainingCny) || remainingCny === 0) setPricePreview(preview, 'premium', `<b>溢价 ${formatPrice(premium, symbol)}</b>`);
+      else setPricePreview(preview, 'premium', `<span>${formatPreviewOperand(premium)} + ${formatPreviewOperand(remainingCny)} =</span><b>总价 ${formatPrice(askingPrice, symbol)}</b>`);
       return;
     }
     if (!Number.isFinite(remainingCny) || remainingCny === 0) {
-      setPricePreview(app, 'premium', `<span>溢价</span><b>${formatPrice(askingPrice, symbol)}</b>`);
+      setPricePreview(preview, 'premium', `<span>溢价</span><b>${formatPrice(askingPrice, symbol)}</b>`);
       return;
     }
     if (askingPrice > remainingCny) {
-      setPricePreview(app, 'premium', `<span>${formatPreviewOperand(askingPrice)} − ${formatPreviewOperand(remainingCny)} =</span><b>溢价 ${formatPrice(askingPrice - remainingCny, symbol)}</b>`);
+      setPricePreview(preview, 'premium', `<span>${formatPreviewOperand(askingPrice)} − ${formatPreviewOperand(remainingCny)} =</span><b>溢价 ${formatPrice(askingPrice - remainingCny, symbol)}</b>`);
       return;
     }
     if (askingPrice === remainingCny) {
-      setPricePreview(app, 'fair', '<b>剩余价值出</b>');
+      setPricePreview(preview, 'fair', '<b>剩余价值出</b>');
       return;
     }
-    setPricePreview(app, 'fair', `<span>${formatPreviewOperand(askingPrice)} ÷ ${formatPreviewOperand(remainingCny)} =</span><b>${(askingPrice / remainingCny * 10).toFixed(1)} 折</b>`);
+    setPricePreview(preview, 'fair', `<span>${formatPreviewOperand(askingPrice)} ÷ ${formatPreviewOperand(remainingCny)} =</span><b>${(askingPrice / remainingCny * 10).toFixed(1)} 折</b>`);
+  }
+
+  function refreshPricePreview(app) {
+    const values = formValues(app);
+    const rate = activeRate(app);
+    const result = calculation(values);
+    renderPricePreview(
+      app.querySelector('[data-nsit-price-preview]'),
+      effectiveAskingPrice(values, rate),
+      parsePrice(values.askingPremium),
+      result && rate ? result.value * rate.rate : null,
+    );
   }
 
   function createStardewValueCard(values, rate, result, askingPrice, style) {
@@ -1809,18 +2161,26 @@ function formValues(app) {
     return response.links.markdown;
   }
 
+  // 预出价格相对剩余价值的结论：溢价多少、打几折、还是正好按剩余价值出。
+  // 出鸡模板的标题段和回帖/私信计算器的回填共用一个口径，避免两边说法不一致。
+  function priceVerdict(askingPrice, premium, remainingCny) {
+    if (Number.isFinite(premium)) return `溢价 ¥${premium.toFixed(2)}`;
+    if (!Number.isFinite(remainingCny) || remainingCny === 0) return `溢价 ¥${askingPrice.toFixed(2)}`;
+    if (askingPrice > remainingCny) return `溢价 ¥${(askingPrice - remainingCny).toFixed(2)}`;
+    if (askingPrice < remainingCny) return `剩余价值 ${(askingPrice / remainingCny * 10).toFixed(1)} 折`;
+    return '剩余价值出';
+  }
+
   function titlePricePreview(values, rate) {
     const askingPrice = effectiveAskingPrice(values, rate);
     if (!Number.isFinite(askingPrice) || askingPrice < 0) return '';
     const result = calculation(values);
     const remainingCny = result && rate ? result.value * rate.rate : null;
     const premium = parsePrice(values.askingPremium);
-    const total = `总价 ${formatPrice(askingPrice, '¥')}`;
-    if (Number.isFinite(premium)) return Number.isFinite(remainingCny) && remainingCny !== 0 ? `${total} · 溢价 ¥${premium.toFixed(2)}` : `溢价 ¥${premium.toFixed(2)}`;
-    if (!Number.isFinite(remainingCny) || remainingCny === 0) return `${total} · 溢价 ${formatPrice(askingPrice, '¥')}`;
-    if (askingPrice > remainingCny) return `${total} · 溢价 ¥${(askingPrice - remainingCny).toFixed(2)}`;
-    if (askingPrice < remainingCny) return `${total} · 剩余价值 ${(askingPrice / remainingCny * 10).toFixed(1)} 折`;
-    return `剩余价值 ¥${askingPrice} 出`;
+    const verdict = priceVerdict(askingPrice, premium, remainingCny);
+    if (verdict === '剩余价值出') return `剩余价值 ¥${askingPrice} 出`;
+    if (Number.isFinite(premium) && (!Number.isFinite(remainingCny) || remainingCny === 0)) return verdict;
+    return `总价 ${formatPrice(askingPrice, '¥')} · ${verdict}`;
   }
 
   function suggestedTitle(values, rate) {
@@ -2321,7 +2681,8 @@ function formValues(app) {
           return;
         }
         const control = app.querySelector(`[name="${CSS.escape(name)}"]`);
-        if (control) control.value = value;
+        // 老草稿里存的是空值时，回落到字段默认项（比如续费周期默认月付），别把默认值冲掉。
+        if (control) control.value = value || MACHINE_FIELD_DEFAULTS[name] || '';
       });
     } catch (_) { /* 无效草稿时忽略 */ }
     try {
@@ -2514,6 +2875,28 @@ function formValues(app) {
     return true;
   }
 
+  function insertEditorText(app, text) {
+    const content = String(text || '').trim();
+    if (!content) return false;
+    const target = editorTarget(app);
+    const codeMirror = target?.matches?.('.CodeMirror') ? target : target?.querySelector?.('.CodeMirror');
+    if (codeMirror?.CodeMirror && typeof codeMirror.CodeMirror.getValue === 'function' && typeof codeMirror.CodeMirror.setValue === 'function') {
+      const editor = codeMirror.CodeMirror;
+      const current = editor.getValue();
+      editor.setValue(`${current}${current.trim() ? (current.endsWith('\n') ? '\n' : '\n\n') : ''}${content}`);
+      editor.focus();
+      return true;
+    }
+    const textarea = target?.matches?.('textarea') ? target : target?.querySelector?.('textarea') || Array.from(document.querySelectorAll('#mde-title ~ textarea, textarea')).find((element) => !app.contains(element));
+    if (!textarea) return false;
+    const current = textarea.value;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(textarea, `${current}${current.trim() ? (current.endsWith('\n') ? '\n' : '\n\n') : ''}${content}`);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
   function selectTradeCategory() {
     const category = document.querySelector('#category');
     if (!category || category.value === 'trade') return;
@@ -2551,6 +2934,19 @@ function formValues(app) {
   function closeModal(app) {
     app.classList.remove('nsit-open');
     app.querySelector('.nsit-modal').setAttribute('aria-hidden', 'true');
+  }
+
+  function openCalcModal(app) {
+    setCalcStatus(app, '');
+    app.classList.add('nsit-calc-open');
+    app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'false');
+    ensureRateTable(app);
+  }
+
+  function closeCalcModal(app) {
+    app.classList.remove('nsit-calc-open');
+    app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'true');
+    setCalcStatus(app, '');
   }
 
   function catalogApiUrl(path, params = null) {
@@ -5384,6 +5780,39 @@ function replyEditor() {
     return Array.from(document.querySelectorAll('textarea')).find((element) => !element.closest(`#${APP_ID}`) && element.closest('[class*="reply"], [class*="comment"]')) || null;
   }
 
+  const POPUP_SELECTOR = '.nsit-modal, .nsit-buy-modal, .nsit-calc-modal, .nsit-catalog-modal, .nsit-registered-machine-configs-modal, .nsit-personalization-modal, .nsit-buy-personalization-modal';
+
+  // 点空白处/其它控件时收起下拉与浮层。原本挂在 document 的 click 上；私信页因下面
+  // 会在 #nsit-app 边界截断冒泡，弹窗内的事件到不了 document，所以抽出来给两处复用。
+  function closeTransientOverlays(app, target) {
+    app.querySelectorAll('.nsit-picker.is-open').forEach((picker) => {
+      if (!picker.contains(target)) setPickerOpen(picker, false);
+    });
+    if (!app.querySelector('.nsit-model-suggest')?.contains(target)) closeModelSuggestions(app);
+    if (!app.querySelector('.nsit-buy-model-suggest')?.contains(target)) closeBuyModelSuggestions(app);
+    if (!app.querySelector('.nsit-traffic-field')?.contains(target)) {
+      const popover = app.querySelector('[data-nsit-traffic-usage-popover]');
+      if (popover) popover.hidden = true;
+    }
+  }
+
+  // 私信页会把整个 #nsit-app（触发按钮 + 全部弹窗）挂进站点的 .mde-toolbar 里。
+  // 这类工具栏为了「点工具按钮不丢光标」，会在 mousedown 等事件上把焦点抢回原生
+  // 编辑器；弹窗是工具栏的后代，于是在弹窗输入框上点击也会被抢走焦点，没法编辑。
+  // 这里在「脚本 UI / 站点编辑器」的边界上截断冒泡：监听在脚本自身所有委托处理器
+  // 之后注册（同一元素同一阶段按注册顺序触发），所以脚本自己的交互照常先跑，只有
+  // 继续冒泡到站点工具栏（及更上层）的部分被拦下，弹窗内即可正常聚焦。
+  function isolateSiteEditorHandlers(app) {
+    ['mousedown', 'pointerdown', 'touchstart', 'mouseup', 'click', 'dblclick', 'keydown', 'keyup'].forEach((type) => {
+      app.addEventListener(type, (event) => {
+        if (!(event.target instanceof Element) || !event.target.closest(POPUP_SELECTOR)) return;
+        // 弹窗内的事件原本会在 document 上触发「收起下拉/浮层」，截断冒泡后到不了，这里补上
+        if (type === 'click') closeTransientOverlays(app, event.target);
+        event.stopPropagation();
+      });
+    });
+  }
+
   function initialize() {
     const existingApps = document.querySelectorAll(`#${APP_ID}`);
     const currentApp = Array.from(existingApps).find((element) => element.dataset.nsitVersion === VERSION);
@@ -5400,7 +5829,8 @@ function replyEditor() {
     const privateMessageToolbar = editor.closest('.message-input')
       ? editor.closest('#code-mirror-editor')?.closest('.cm-wrapper')?.previousElementSibling
       : null;
-    if (privateMessageToolbar?.matches('.mde-toolbar')) privateMessageToolbar.append(app);
+    const insidePrivateMessageToolbar = Boolean(privateMessageToolbar?.matches('.mde-toolbar'));
+    if (insidePrivateMessageToolbar) privateMessageToolbar.append(app);
     else {
       const hint = document.querySelector('#editor-body .window_header a[href*="runoob.com/markdown"]');
       if (hint?.parentElement) hint.parentElement.prepend(app);
@@ -5419,6 +5849,14 @@ function replyEditor() {
     refreshRemainingTrafficValidity(app);
     loadRate(app);
     app.addEventListener('input', (event) => {
+      if (event.target.closest('.nsit-calc-modal')) {
+        if (event.target.matches('[data-nsit-calc-amount]')) {
+          const index = calcAmountInputs(app).indexOf(event.target);
+          if (index >= 0) app._nsitCalcBase = index;
+        }
+        refreshCalc(app);
+        return;
+      }
       if (event.target.matches('[data-nsit-buy-catalog-search]')) {
         scheduleBuyMachineCatalogSearch(app);
         return;
@@ -5493,6 +5931,10 @@ function replyEditor() {
       }
     });
     app.addEventListener('change', (event) => {
+      if (event.target.closest('.nsit-calc-modal')) {
+        refreshCalc(app);
+        return;
+      }
       if (event.target.closest('#nsit-buy-form')) {
         const tag = event.target.matches('[name="buyTags"]') ? event.target : null;
         if (tag?.checked) app.querySelectorAll(`[name="buyTags"][data-buy-tag-group="${tag.dataset.buyTagGroup}"]`).forEach((input) => { if (input !== tag) input.checked = false; });
@@ -5796,6 +6238,30 @@ function replyEditor() {
         fillBuyPost(app);
         return;
       }
+      if (action === 'close-calc') {
+        closeCalcModal(app);
+        return;
+      }
+      if (action === 'fill-calc-remaining') {
+        fillCalcRemaining(app);
+        return;
+      }
+      if (action === 'fill-calc-convert') {
+        fillCalcConvert(app);
+        return;
+      }
+      if (action === 'refresh-calc-rate') {
+        ensureRateTable(app, true);
+        return;
+      }
+      if (action === 'add-calc-currency') {
+        addCalcTarget(app);
+        return;
+      }
+      if (action === 'remove-calc-currency') {
+        removeCalcTarget(app, event.target.closest('button'));
+        return;
+      }
       if (action === 'clear-buy') {
         app.querySelector('#nsit-buy-form').reset();
         syncBuyPriceInputs(app); refreshBuyTitle(app); saveBuyDraft(app);
@@ -5810,7 +6276,8 @@ function replyEditor() {
           saveDraft(app); refreshCard(app); refreshPricePreview(app); setStatus(app, '已删除当前单机。');
           return;
         }
-        app.querySelector('form').reset();
+        // 用 id 定位：收鸡模板的表单排在前面，querySelector('form') 会拿错。
+        app.querySelector('#nsit-form').reset();
         app.querySelector('[name="tradeDate"]').value = today();
         app.querySelector('[name="remainingTraffic"]').value = '';
         app._nsitMachines[app._nsitActiveMachine] = machineSnapshot(app);
@@ -5877,6 +6344,7 @@ function replyEditor() {
       scheduleBuyMachineCatalogSearch(app, true);
       app.querySelector('[data-nsit-buy-catalog-search]')?.focus();
     });
+    app.querySelector('.nsit-calc-trigger')?.addEventListener('click', () => openCalcModal(app));
     app.querySelector('.nsit-modal').addEventListener('click', (event) => {
       if (event.target === event.currentTarget) {
         closeModal(app);
@@ -5888,6 +6356,9 @@ function replyEditor() {
         app.querySelector('.nsit-buy-modal').setAttribute('aria-hidden', 'true');
       }
     });
+    app.querySelector('.nsit-calc-modal')?.addEventListener('click', (event) => {
+      if (event.target === event.currentTarget) closeCalcModal(app);
+    });
     app.querySelector('.nsit-catalog-modal').addEventListener('click', (event) => {
       if (event.target === event.currentTarget) closeMachineCatalog(app);
     });
@@ -5896,16 +6367,10 @@ function replyEditor() {
     });
     document.addEventListener('click', (event) => {
       if (!app.isConnected) return;
-      app.querySelectorAll('.nsit-picker.is-open').forEach((picker) => {
-        if (!picker.contains(event.target)) setPickerOpen(picker, false);
-      });
-      if (!app.querySelector('.nsit-model-suggest')?.contains(event.target)) closeModelSuggestions(app);
-      if (!app.querySelector('.nsit-buy-model-suggest')?.contains(event.target)) closeBuyModelSuggestions(app);
-      if (!app.querySelector('.nsit-traffic-field')?.contains(event.target)) {
-        const popover = app.querySelector('[data-nsit-traffic-usage-popover]');
-        if (popover) popover.hidden = true;
-      }
+      closeTransientOverlays(app, event.target);
     });
+    // 放在所有内部委托处理器之后：先让脚本自己的交互处理完，再截断冒泡到站点编辑器的事件
+    if (insidePrivateMessageToolbar) isolateSiteEditorHandlers(app);
   }
 
   injectBaseStyles();

@@ -4,6 +4,39 @@
     return Array.from(document.querySelectorAll('textarea')).find((element) => !element.closest(`#${APP_ID}`) && element.closest('[class*="reply"], [class*="comment"]')) || null;
   }
 
+  const POPUP_SELECTOR = '.nsit-modal, .nsit-buy-modal, .nsit-calc-modal, .nsit-catalog-modal, .nsit-registered-machine-configs-modal, .nsit-personalization-modal, .nsit-buy-personalization-modal';
+
+  // 点空白处/其它控件时收起下拉与浮层。原本挂在 document 的 click 上；私信页因下面
+  // 会在 #nsit-app 边界截断冒泡，弹窗内的事件到不了 document，所以抽出来给两处复用。
+  function closeTransientOverlays(app, target) {
+    app.querySelectorAll('.nsit-picker.is-open').forEach((picker) => {
+      if (!picker.contains(target)) setPickerOpen(picker, false);
+    });
+    if (!app.querySelector('.nsit-model-suggest')?.contains(target)) closeModelSuggestions(app);
+    if (!app.querySelector('.nsit-buy-model-suggest')?.contains(target)) closeBuyModelSuggestions(app);
+    if (!app.querySelector('.nsit-traffic-field')?.contains(target)) {
+      const popover = app.querySelector('[data-nsit-traffic-usage-popover]');
+      if (popover) popover.hidden = true;
+    }
+  }
+
+  // 私信页会把整个 #nsit-app（触发按钮 + 全部弹窗）挂进站点的 .mde-toolbar 里。
+  // 这类工具栏为了「点工具按钮不丢光标」，会在 mousedown 等事件上把焦点抢回原生
+  // 编辑器；弹窗是工具栏的后代，于是在弹窗输入框上点击也会被抢走焦点，没法编辑。
+  // 这里在「脚本 UI / 站点编辑器」的边界上截断冒泡：监听在脚本自身所有委托处理器
+  // 之后注册（同一元素同一阶段按注册顺序触发），所以脚本自己的交互照常先跑，只有
+  // 继续冒泡到站点工具栏（及更上层）的部分被拦下，弹窗内即可正常聚焦。
+  function isolateSiteEditorHandlers(app) {
+    ['mousedown', 'pointerdown', 'touchstart', 'mouseup', 'click', 'dblclick', 'keydown', 'keyup'].forEach((type) => {
+      app.addEventListener(type, (event) => {
+        if (!(event.target instanceof Element) || !event.target.closest(POPUP_SELECTOR)) return;
+        // 弹窗内的事件原本会在 document 上触发「收起下拉/浮层」，截断冒泡后到不了，这里补上
+        if (type === 'click') closeTransientOverlays(app, event.target);
+        event.stopPropagation();
+      });
+    });
+  }
+
   function initialize() {
     const existingApps = document.querySelectorAll(`#${APP_ID}`);
     const currentApp = Array.from(existingApps).find((element) => element.dataset.nsitVersion === VERSION);
@@ -20,7 +53,8 @@
     const privateMessageToolbar = editor.closest('.message-input')
       ? editor.closest('#code-mirror-editor')?.closest('.cm-wrapper')?.previousElementSibling
       : null;
-    if (privateMessageToolbar?.matches('.mde-toolbar')) privateMessageToolbar.append(app);
+    const insidePrivateMessageToolbar = Boolean(privateMessageToolbar?.matches('.mde-toolbar'));
+    if (insidePrivateMessageToolbar) privateMessageToolbar.append(app);
     else {
       const hint = document.querySelector('#editor-body .window_header a[href*="runoob.com/markdown"]');
       if (hint?.parentElement) hint.parentElement.prepend(app);
@@ -39,6 +73,14 @@
     refreshRemainingTrafficValidity(app);
     loadRate(app);
     app.addEventListener('input', (event) => {
+      if (event.target.closest('.nsit-calc-modal')) {
+        if (event.target.matches('[data-nsit-calc-amount]')) {
+          const index = calcAmountInputs(app).indexOf(event.target);
+          if (index >= 0) app._nsitCalcBase = index;
+        }
+        refreshCalc(app);
+        return;
+      }
       if (event.target.matches('[data-nsit-buy-catalog-search]')) {
         scheduleBuyMachineCatalogSearch(app);
         return;
@@ -113,6 +155,10 @@
       }
     });
     app.addEventListener('change', (event) => {
+      if (event.target.closest('.nsit-calc-modal')) {
+        refreshCalc(app);
+        return;
+      }
       if (event.target.closest('#nsit-buy-form')) {
         const tag = event.target.matches('[name="buyTags"]') ? event.target : null;
         if (tag?.checked) app.querySelectorAll(`[name="buyTags"][data-buy-tag-group="${tag.dataset.buyTagGroup}"]`).forEach((input) => { if (input !== tag) input.checked = false; });
@@ -416,6 +462,30 @@
         fillBuyPost(app);
         return;
       }
+      if (action === 'close-calc') {
+        closeCalcModal(app);
+        return;
+      }
+      if (action === 'fill-calc-remaining') {
+        fillCalcRemaining(app);
+        return;
+      }
+      if (action === 'fill-calc-convert') {
+        fillCalcConvert(app);
+        return;
+      }
+      if (action === 'refresh-calc-rate') {
+        ensureRateTable(app, true);
+        return;
+      }
+      if (action === 'add-calc-currency') {
+        addCalcTarget(app);
+        return;
+      }
+      if (action === 'remove-calc-currency') {
+        removeCalcTarget(app, event.target.closest('button'));
+        return;
+      }
       if (action === 'clear-buy') {
         app.querySelector('#nsit-buy-form').reset();
         syncBuyPriceInputs(app); refreshBuyTitle(app); saveBuyDraft(app);
@@ -430,7 +500,8 @@
           saveDraft(app); refreshCard(app); refreshPricePreview(app); setStatus(app, '已删除当前单机。');
           return;
         }
-        app.querySelector('form').reset();
+        // 用 id 定位：收鸡模板的表单排在前面，querySelector('form') 会拿错。
+        app.querySelector('#nsit-form').reset();
         app.querySelector('[name="tradeDate"]').value = today();
         app.querySelector('[name="remainingTraffic"]').value = '';
         app._nsitMachines[app._nsitActiveMachine] = machineSnapshot(app);
@@ -497,6 +568,7 @@
       scheduleBuyMachineCatalogSearch(app, true);
       app.querySelector('[data-nsit-buy-catalog-search]')?.focus();
     });
+    app.querySelector('.nsit-calc-trigger')?.addEventListener('click', () => openCalcModal(app));
     app.querySelector('.nsit-modal').addEventListener('click', (event) => {
       if (event.target === event.currentTarget) {
         closeModal(app);
@@ -508,6 +580,9 @@
         app.querySelector('.nsit-buy-modal').setAttribute('aria-hidden', 'true');
       }
     });
+    app.querySelector('.nsit-calc-modal')?.addEventListener('click', (event) => {
+      if (event.target === event.currentTarget) closeCalcModal(app);
+    });
     app.querySelector('.nsit-catalog-modal').addEventListener('click', (event) => {
       if (event.target === event.currentTarget) closeMachineCatalog(app);
     });
@@ -516,16 +591,10 @@
     });
     document.addEventListener('click', (event) => {
       if (!app.isConnected) return;
-      app.querySelectorAll('.nsit-picker.is-open').forEach((picker) => {
-        if (!picker.contains(event.target)) setPickerOpen(picker, false);
-      });
-      if (!app.querySelector('.nsit-model-suggest')?.contains(event.target)) closeModelSuggestions(app);
-      if (!app.querySelector('.nsit-buy-model-suggest')?.contains(event.target)) closeBuyModelSuggestions(app);
-      if (!app.querySelector('.nsit-traffic-field')?.contains(event.target)) {
-        const popover = app.querySelector('[data-nsit-traffic-usage-popover]');
-        if (popover) popover.hidden = true;
-      }
+      closeTransientOverlays(app, event.target);
     });
+    // 放在所有内部委托处理器之后：先让脚本自己的交互处理完，再截断冒泡到站点编辑器的事件
+    if (insidePrivateMessageToolbar) isolateSiteEditorHandlers(app);
   }
 
   injectBaseStyles();

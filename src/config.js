@@ -1,5 +1,5 @@
   const APP_ID = 'nsit-app';
-  const VERSION = '1.4.41';
+  const VERSION = '1.4.43';
   const NODEIMAGE_KEY = 'nsit-nodeimage-api-key';
   const RUNTIME_KEY = '__nodeSeekIssueTemplatesRuntime__';
   const STORAGE_KEY = 'nsit-single-server-draft-v1';
@@ -33,10 +33,24 @@
   ];
   const DEFAULT_RENEWAL_FIELDS = RENEWAL_FIELD_OPTIONS.map(([name]) => name);
   const MACHINE_FIELDS = ['vendor', 'model', 'cpu', 'memory', 'disk', 'bandwidth', 'traffic', 'remainingTraffic', 'renewalCycle', 'renewalAmount', 'currency', 'expiryDate', 'tradeDate', 'nqUrl', 'tqUrl', 'askingPrice', 'askingPremium', 'remarks'];
+  // 表单里没有填值时的默认项：新增单机、打开草稿、套用配置库记录都会走这里。
+  const MACHINE_FIELD_DEFAULTS = { currency: 'USD 美元', renewalCycle: '月付' };
   const RATE_CACHE_KEY = 'nsit-cny-rates-v1';
+  const RATE_TABLE_KEY = 'nsit-rate-table-v1';
   const MACHINE_CATALOG_API_URL = 'https://nsit-machine-catalog.ruoqianfengshao.workers.dev';
   const MACHINE_CATALOG_FIELDS = ['vendor', 'model', 'cpu', 'memory', 'disk', 'bandwidth', 'traffic', 'renewalCycle', 'renewalAmount', 'currency'];
   const CURRENCY_CODES = { 'CNY 人民币': 'CNY', 'USD 美元': 'USD', 'EUR 欧元': 'EUR', 'GBP 英镑': 'GBP', 'JPY 日元': 'JPY', 'KRW 韩元': 'KRW', 'AUD 澳元': 'AUD', 'HKD 港元': 'HKD', 'TWD 新台币': 'TWD', 'CAD 加拿大元': 'CAD', 'SGD 新加坡元': 'SGD' };
+  // 计算器可换算的币种：比主表单宽，覆盖常见交易地区；全部在 open.er-api 的汇率表里。
+  const CALC_CURRENCIES = {
+    'CNY 人民币': 'CNY', 'USD 美元': 'USD', 'EUR 欧元': 'EUR', 'GBP 英镑': 'GBP',
+    'JPY 日元': 'JPY', 'KRW 韩元': 'KRW', 'HKD 港元': 'HKD', 'TWD 新台币': 'TWD',
+    'MOP 澳门元': 'MOP', 'SGD 新加坡元': 'SGD', 'MYR 马来西亚林吉特': 'MYR', 'THB 泰铢': 'THB',
+    'PHP 菲律宾比索': 'PHP', 'VND 越南盾': 'VND', 'IDR 印尼盾': 'IDR', 'INR 印度卢比': 'INR',
+    'AUD 澳元': 'AUD', 'NZD 新西兰元': 'NZD', 'CAD 加拿大元': 'CAD', 'CHF 瑞士法郎': 'CHF',
+    'SEK 瑞典克朗': 'SEK', 'NOK 挪威克朗': 'NOK', 'DKK 丹麦克朗': 'DKK', 'PLN 波兰兹罗提': 'PLN',
+    'CZK 捷克克朗': 'CZK', 'RUB 卢布': 'RUB', 'TRY 土耳其里拉': 'TRY', 'AED 迪拉姆': 'AED',
+    'SAR 里亚尔': 'SAR', 'BRL 巴西雷亚尔': 'BRL', 'MXN 墨西哥比索': 'MXN', 'ZAR 南非兰特': 'ZAR',
+  };
   const CYCLE_MONTHS = { '月付': 1, '季付': 3, '半年付': 6, '年付': 12, '两年付': 24, '三年付': 36, '五年付': 60 };
   const OPTIONS = {
     vendors: ['搬瓦工', 'DMIT', 'RackNerd', 'Vultr', 'CloudCone', 'BuyVM', 'Hetzner', 'Linode', 'DigitalOcean', 'Lightlayer', '狗妈咪', '奶爸', 'Vmiss', '阿里云', '腾讯云', '火山云', '华为云'],

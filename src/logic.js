@@ -162,7 +162,7 @@
   function applyMachine(app, machine) {
     MACHINE_FIELDS.forEach((name) => {
       const control = app.querySelector(`[name="${CSS.escape(name)}"]`);
-      if (control) control.value = machine[name] || (name === 'currency' ? 'USD 美元' : '');
+      if (control) control.value = machine[name] || MACHINE_FIELD_DEFAULTS[name] || '';
     });
     app.querySelectorAll('[name="transferTags"]').forEach((control) => { control.checked = (machine.transferTags || []).includes(control.value); });
     renderPersonalization(app);
@@ -389,15 +389,61 @@
     } catch (_) { /* 缓存失败时仍可使用当前汇率 */ }
   }
 
+  function cachedRate(app, code) {
+    return code ? app._nsitRates?.[code] || rateFromCache(code) : null;
+  }
+
+  function rememberRate(app, code, record) {
+    app._nsitRates = { ...(app._nsitRates || {}), [code]: record };
+    if (record?.table) app._nsitRateTable = record.table;
+    return record;
+  }
+
+  async function fetchRate(code) {
+    const response = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(code)}`);
+    const data = await response.json();
+    const rate = Number(data?.rates?.CNY);
+    if (!response.ok || !Number.isFinite(rate) || rate <= 0) throw new Error('invalid rate');
+    saveRateToCache(code, rate);
+    // 同一份响应就是一张完整汇率表（base 币种兑所有币种），存下来给计算器算任意币种的交叉汇率。
+    const table = { base: data.base_code || code, rates: data.rates, updatedAt: Date.now() };
+    saveRateTable(table);
+    return { rate, updatedAt: Date.now(), table };
+  }
+
+  function rateTableFromCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(RATE_TABLE_KEY) || 'null');
+      return cached?.rates && cached.updatedAt ? cached : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveRateTable(table) {
+    try { localStorage.setItem(RATE_TABLE_KEY, JSON.stringify(table)); } catch (_) { /* 缓存失败时仍可使用当前汇率 */ }
+  }
+
+  function rateTable(app) {
+    return app._nsitRateTable || rateTableFromCache();
+  }
+
+  // 交叉汇率与基准币种无关：任何一张表都能算 A→B = rate[B] / rate[A]。
+  function crossRate(table, from, to) {
+    if (!table || !from || !to) return null;
+    const fromRate = Number(table.rates[from]);
+    const toRate = Number(table.rates[to]);
+    if (!Number.isFinite(fromRate) || !Number.isFinite(toRate) || fromRate <= 0) return null;
+    return toRate / fromRate;
+  }
+
   function activeRate(app) {
     const code = currencyCode(formValues(app).currency);
-    if (!code) return null;
-    return app._nsitRates?.[code] || rateFromCache(code);
+    return cachedRate(app, code);
   }
 
   function rateForValues(app, values) {
-    const code = currencyCode(values.currency);
-    return code ? app._nsitRates?.[code] || rateFromCache(code) : null;
+    return cachedRate(app, currencyCode(values.currency));
   }
 
   function refreshRateDisplay(app, message = '') {
@@ -429,18 +475,240 @@
     }
     refreshRateDisplay(app, '正在加载…');
     try {
-      const response = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(code)}`);
-      const data = await response.json();
-      const rate = Number(data?.rates?.CNY);
-      if (!response.ok || !Number.isFinite(rate) || rate <= 0) throw new Error('invalid rate');
-      const record = { rate, updatedAt: Date.now() };
-      app._nsitRates = { ...(app._nsitRates || {}), [code]: record };
-      saveRateToCache(code, rate);
+      rememberRate(app, code, await fetchRate(code));
       refreshRateDisplay(app);
     } catch (_) {
       refreshRateDisplay(app, '汇率加载失败');
     }
     refreshCard(app); refreshPricePreview(app); refreshTitle(app);
+  }
+
+  /* 剩余价值 / 汇率计算器 ------------------------------------------------------
+   * 回帖、私信里的轻量工具：左侧算剩余价值、右侧换算汇率，两块各自回填编辑器，
+   * 不复用出鸡模板表单，避免和主表单字段互相干扰。汇率与主表单共用一份缓存。
+   * ------------------------------------------------------------------------- */
+
+  function calcValues(app) {
+    const read = (name) => app.querySelector(`.nsit-calc-modal [name="${name}"]`)?.value.trim() || '';
+    return {
+      renewalAmount: read('calcRenewalAmount'),
+      currency: read('calcCurrency'),
+      renewalCycle: read('calcRenewalCycle'),
+      expiryDate: read('calcExpiryDate'),
+      tradeDate: read('calcTradeDate'),
+      askingPremium: read('calcAskingPremium'),
+      askingPrice: read('calcAskingPrice'),
+    };
+  }
+
+  function calcCurrencyCode(label) {
+    return CALC_CURRENCIES[label] || '';
+  }
+
+  function calcTargetInputs(app) {
+    return Array.from(app.querySelectorAll('.nsit-calc-modal [data-nsit-calc-target-input]'));
+  }
+
+  function calcAmountInputs(app) {
+    return Array.from(app.querySelectorAll('.nsit-calc-modal [data-nsit-calc-amount]'));
+  }
+
+  // 对照表是联动的：最后输入金额的那一行就是基准行，其他行按它换算。
+  function calcBaseIndex(app) {
+    const count = calcAmountInputs(app).length;
+    if (!count) return -1;
+    const index = Number.isInteger(app._nsitCalcBase) ? app._nsitCalcBase : 0;
+    return Math.min(Math.max(index, 0), count - 1);
+  }
+
+  function calcBaseCurrency(app) {
+    const index = calcBaseIndex(app);
+    return index < 0 ? '' : calcCurrencyCode(calcTargetInputs(app)[index]?.value || '');
+  }
+
+  function addCalcTarget(app) {
+    const container = app.querySelector('[data-nsit-calc-rates]');
+    if (!container) return;
+    const used = new Set(calcTargetInputs(app).map((input) => input.value));
+    const labels = Object.keys(CALC_CURRENCIES);
+    const base = calcBaseCurrency(app);
+    const next = labels.find((label) => !used.has(label) && label !== base) || labels.find((label) => !used.has(label)) || labels[0];
+    container.insertAdjacentHTML('beforeend', calcTargetRowMarkup(next));
+    refreshCalc(app);
+  }
+
+  function removeCalcTarget(app, button) {
+    const row = button?.closest('.nsit-calc-rate-row');
+    const inputs = calcTargetInputs(app);
+    if (!row || inputs.length <= 1) return;
+    const index = inputs.indexOf(row.querySelector('[data-nsit-calc-target-input]'));
+    row.remove();
+    // 删掉的是基准行时回到第一行，否则基准索引跟着前移。
+    if (app._nsitCalcBase === index) app._nsitCalcBase = 0;
+    else if (app._nsitCalcBase > index) app._nsitCalcBase -= 1;
+    refreshCalc(app);
+  }
+
+  function setCalcStatus(app, message) {
+    const target = app.querySelector('[data-nsit-calc-status]');
+    if (target) target.textContent = message;
+  }
+
+  async function fetchRateTable() {
+    const record = await fetchRate('USD');
+    if (!record.table) throw new Error('invalid rate table');
+    return record.table;
+  }
+
+  function ensureRateTable(app, force = false) {
+    const cached = rateTable(app);
+    if (!force && cached && Date.now() - cached.updatedAt < 3600000) {
+      app._nsitRateTable = cached;
+      refreshCalc(app);
+      return;
+    }
+    if (app._nsitCalcRatePending) return;
+    app._nsitCalcRatePending = true;
+    app._nsitCalcRateFailed = false;
+    fetchRateTable()
+      .then((table) => { app._nsitRateTable = table; })
+      .catch(() => { app._nsitCalcRateFailed = true; })
+      .finally(() => { app._nsitCalcRatePending = false; refreshCalc(app); });
+    refreshCalc(app);
+  }
+
+  function calcRateText(app, from, rate, to = 'CNY') {
+    if (!from) return '选择币种后加载';
+    if (Number.isFinite(rate)) return `1 ${from} = ${rate.toFixed(4)} ${to}`;
+    return app._nsitCalcRateFailed ? '汇率加载失败' : '汇率加载中…';
+  }
+
+  function calcRemainingState(app) {
+    const values = calcValues(app);
+    const code = calcCurrencyCode(values.currency);
+    const rate = crossRate(rateTable(app), code, 'CNY');
+    const result = values.renewalAmount ? calculation({ ...values }) : null;
+    return { values, code, rate, result, remaining: result && Number.isFinite(rate) ? result.value * rate : null };
+  }
+
+  // 回填文本照搬出鸡模板「续费与价值」那一段的结构；预出价格、溢价都可有可无。
+  function remainingValueText(state) {
+    const { values, code, rate, result, remaining } = state;
+    if (!result || !Number.isFinite(remaining)) return '';
+    const symbol = currencySymbol(values.currency);
+    const renewal = [
+      values.renewalAmount ? `${symbol}${formatAmount(values.renewalAmount)}（${values.currency}）` : '',
+      values.renewalCycle,
+    ].filter(Boolean).join(' / ');
+    const detail = code === 'CNY'
+      ? `（剩余 ${result.daysLeft} 天，${result.percentage.toFixed(1)}%）`
+      : ` = ${symbol}${result.value.toFixed(2)} × ${rate.toFixed(4)}（剩余 ${result.daysLeft} 天，${result.percentage.toFixed(1)}%）`;
+    const lines = [
+      renewal ? `- 续费金额 / 周期：${renewal}` : '',
+      values.expiryDate ? `- 到期日期：${values.expiryDate}` : '',
+      values.tradeDate ? `- 交易日期：${values.tradeDate}` : '',
+      `- 剩余价值：¥${remaining.toFixed(2)}${detail}`,
+    ].filter(Boolean);
+    const askingPrice = effectiveCalcAskingPrice(values, remaining);
+    if (Number.isFinite(askingPrice)) lines.push(`- 预出价格：¥${askingPrice.toFixed(2)}（${priceVerdict(askingPrice, parsePrice(values.askingPremium), remaining)}）`);
+    return `## 续费与价值\n${lines.join('\n')}`;
+  }
+
+  function refreshCalcRemaining(app, state) {
+    const { values, code, rate, result, remaining } = state;
+    const amount = app.querySelector('[data-nsit-calc-remaining-amount]');
+    const days = app.querySelector('[data-nsit-calc-remaining-days]');
+    const percent = app.querySelector('[data-nsit-calc-remaining-percent]');
+    const rateLine = app.querySelector('[data-nsit-calc-remaining-rate]');
+    const progressTrack = app.querySelector('.nsit-calc-progress');
+    const progress = app.querySelector('[data-nsit-calc-remaining-progress]');
+    const preview = app.querySelector('[data-nsit-calc-price-preview]');
+    const insert = app.querySelector('[data-nsit-calc-remaining-insert]');
+    const button = app.querySelector('[data-action="fill-calc-remaining"]');
+    if (rateLine) rateLine.textContent = calcRateText(app, code, rate);
+    if (amount) amount.textContent = Number.isFinite(remaining) ? remaining.toFixed(2) : '—';
+    if (days) days.textContent = result ? `剩余 ${result.daysLeft} 天` : '剩余 ? 天';
+    if (percent) percent.textContent = result ? `周期占比 ${result.percentage.toFixed(1)}%` : '周期占比 ?';
+    if (progress) progress.style.width = result ? `${result.percentage}%` : '0%';
+    if (progressTrack) progressTrack.hidden = !result;
+    if (preview) renderPricePreview(preview, effectiveCalcAskingPrice(values, remaining), parsePrice(values.askingPremium), remaining, '预出价格可留空');
+    const text = remainingValueText(state);
+    if (insert) insert.textContent = text || '—';
+    if (button) button.disabled = !text;
+  }
+
+  function effectiveCalcAskingPrice(values, remaining) {
+    const askingPrice = parsePrice(values.askingPrice);
+    if (Number.isFinite(askingPrice)) return askingPrice;
+    const premium = parsePrice(values.askingPremium);
+    return Number.isFinite(premium) && Number.isFinite(remaining) ? remaining + premium : NaN;
+  }
+
+  // 对照表：每行一个币种，任意一行填了金额就以它为准换算其他行。
+  function calcConvertRows(app) {
+    const table = rateTable(app);
+    const amounts = calcAmountInputs(app);
+    const codes = calcTargetInputs(app).map((input) => calcCurrencyCode(input.value));
+    const baseIndex = calcBaseIndex(app);
+    const baseCode = codes[baseIndex] || '';
+    const value = parsePrice(amounts[baseIndex]?.value);
+    const ready = Boolean(baseCode) && Number.isFinite(value);
+    return {
+      codes,
+      baseIndex,
+      baseCode,
+      amount: value,
+      ready,
+      rates: codes.map((code) => crossRate(table, baseCode, code)),
+    };
+  }
+
+  function refreshCalcConvert(app) {
+    const { codes, baseIndex, baseCode, amount, ready, rates } = calcConvertRows(app);
+    const rows = Array.from(app.querySelectorAll('.nsit-calc-modal .nsit-calc-rate-row'));
+    rows.forEach((row, index) => {
+      const rate = rates[index];
+      const input = row.querySelector('[data-nsit-calc-amount]');
+      const line = row.querySelector('[data-nsit-calc-rate-line]');
+      // 基准行保留用户输入，其他行只做展示，写值时不派发事件以免递归。
+      const value = index === baseIndex || !ready || !Number.isFinite(rate) ? (index === baseIndex ? input?.value : '') : (amount * rate).toFixed(2);
+      if (input && input.value !== value) input.value = value;
+      if (line) line.textContent = !codes[index] || !baseCode ? '' : index === baseIndex ? '基准' : calcRateText(app, baseCode, rate, codes[index]);
+    });
+    const insert = app.querySelector('[data-nsit-calc-convert-insert]');
+    const button = app.querySelector('[data-action="fill-calc-convert"]');
+    const text = ready ? calcConvertText({ codes, baseIndex, baseCode, amount, rates }) : '';
+    if (insert) insert.textContent = text || '—';
+    if (button) button.disabled = !text;
+  }
+
+  function calcConvertText({ codes, baseIndex, baseCode, amount, rates }) {
+    const parts = codes
+      .map((code, index) => (index !== baseIndex && code && Number.isFinite(rates[index]) ? `${(amount * rates[index]).toFixed(2)} ${code}` : ''))
+      .filter(Boolean);
+    return parts.length ? `${Number.isInteger(amount) ? amount : amount.toFixed(2)} ${baseCode} ≈ ${parts.join(' / ')}` : '';
+  }
+
+  function refreshCalc(app) {
+    if (!app.querySelector('.nsit-calc-modal')) return;
+    refreshCalcRemaining(app, calcRemainingState(app));
+    refreshCalcConvert(app);
+  }
+
+  function fillCalcRemaining(app) {
+    const text = remainingValueText(calcRemainingState(app));
+    if (!text) return;
+    // 回填成功就直接关掉弹窗；只有找不到编辑器这种异常才留在弹窗里提示。
+    if (insertEditorText(app, text)) closeCalcModal(app);
+    else setCalcStatus(app, '未找到 NodeSeek 正文编辑器，请刷新页面后重试。');
+  }
+
+  function fillCalcConvert(app) {
+    const state = calcConvertRows(app);
+    const text = state.ready ? calcConvertText(state) : '';
+    if (!text) return;
+    if (insertEditorText(app, text)) closeCalcModal(app);
+    else setCalcStatus(app, '未找到 NodeSeek 正文编辑器，请刷新页面后重试。');
   }
 
   function refreshCard(app) {
@@ -503,8 +771,8 @@
     return Number(value).toFixed(2);
   }
 
-  function setPricePreview(app, state, html) {
-    const preview = app.querySelector('[data-nsit-price-preview]');
+  function setPricePreview(preview, state, html) {
+    if (!preview) return;
     if (preview.dataset.previewHtml === html && preview.dataset.priceState === state) return;
     preview.dataset.priceState = state;
     preview.dataset.previewHtml = html;
@@ -515,40 +783,44 @@
     preview.append(content);
   }
 
-  function refreshPricePreview(app) {
-    const values = formValues(app);
-    const preview = app.querySelector('[data-nsit-price-preview]');
-    const premium = parsePrice(values.askingPremium);
-    const askingPrice = effectiveAskingPrice(values, activeRate(app));
-    const result = calculation(values);
-    const rate = activeRate(app);
+  // 剩余价值 + 预出价格的结论。出鸡模板和回帖/私信计算器共用这一套口径。
+  // emptyText 区分两处口径：出鸡模板要求填价格，计算器允许预出价格和溢价同时为空。
+  function renderPricePreview(preview, askingPrice, premium, remainingCny, emptyText = '填写预出价格或预出溢价后显示价格预览') {
     const symbol = '¥';
     if (!Number.isFinite(askingPrice) || askingPrice < 0) {
-      setPricePreview(app, 'neutral', '填写预出价格或预出溢价后显示价格预览');
+      setPricePreview(preview, 'neutral', emptyText);
       return;
     }
-    const remainingCny = result && rate ? result.value * rate.rate : null;
     if (Number.isFinite(premium)) {
-      if (!Number.isFinite(remainingCny) || remainingCny === 0) {
-        setPricePreview(app, 'premium', `<b>溢价 ${formatPrice(premium, symbol)}</b>`);
-      } else {
-        setPricePreview(app, 'premium', `<span>${formatPreviewOperand(premium)} + ${formatPreviewOperand(remainingCny)} =</span><b>总价 ${formatPrice(askingPrice, symbol)}</b>`);
-      }
+      if (!Number.isFinite(remainingCny) || remainingCny === 0) setPricePreview(preview, 'premium', `<b>溢价 ${formatPrice(premium, symbol)}</b>`);
+      else setPricePreview(preview, 'premium', `<span>${formatPreviewOperand(premium)} + ${formatPreviewOperand(remainingCny)} =</span><b>总价 ${formatPrice(askingPrice, symbol)}</b>`);
       return;
     }
     if (!Number.isFinite(remainingCny) || remainingCny === 0) {
-      setPricePreview(app, 'premium', `<span>溢价</span><b>${formatPrice(askingPrice, symbol)}</b>`);
+      setPricePreview(preview, 'premium', `<span>溢价</span><b>${formatPrice(askingPrice, symbol)}</b>`);
       return;
     }
     if (askingPrice > remainingCny) {
-      setPricePreview(app, 'premium', `<span>${formatPreviewOperand(askingPrice)} − ${formatPreviewOperand(remainingCny)} =</span><b>溢价 ${formatPrice(askingPrice - remainingCny, symbol)}</b>`);
+      setPricePreview(preview, 'premium', `<span>${formatPreviewOperand(askingPrice)} − ${formatPreviewOperand(remainingCny)} =</span><b>溢价 ${formatPrice(askingPrice - remainingCny, symbol)}</b>`);
       return;
     }
     if (askingPrice === remainingCny) {
-      setPricePreview(app, 'fair', '<b>剩余价值出</b>');
+      setPricePreview(preview, 'fair', '<b>剩余价值出</b>');
       return;
     }
-    setPricePreview(app, 'fair', `<span>${formatPreviewOperand(askingPrice)} ÷ ${formatPreviewOperand(remainingCny)} =</span><b>${(askingPrice / remainingCny * 10).toFixed(1)} 折</b>`);
+    setPricePreview(preview, 'fair', `<span>${formatPreviewOperand(askingPrice)} ÷ ${formatPreviewOperand(remainingCny)} =</span><b>${(askingPrice / remainingCny * 10).toFixed(1)} 折</b>`);
+  }
+
+  function refreshPricePreview(app) {
+    const values = formValues(app);
+    const rate = activeRate(app);
+    const result = calculation(values);
+    renderPricePreview(
+      app.querySelector('[data-nsit-price-preview]'),
+      effectiveAskingPrice(values, rate),
+      parsePrice(values.askingPremium),
+      result && rate ? result.value * rate.rate : null,
+    );
   }
 
   function createStardewValueCard(values, rate, result, askingPrice, style) {
@@ -924,18 +1196,26 @@
     return response.links.markdown;
   }
 
+  // 预出价格相对剩余价值的结论：溢价多少、打几折、还是正好按剩余价值出。
+  // 出鸡模板的标题段和回帖/私信计算器的回填共用一个口径，避免两边说法不一致。
+  function priceVerdict(askingPrice, premium, remainingCny) {
+    if (Number.isFinite(premium)) return `溢价 ¥${premium.toFixed(2)}`;
+    if (!Number.isFinite(remainingCny) || remainingCny === 0) return `溢价 ¥${askingPrice.toFixed(2)}`;
+    if (askingPrice > remainingCny) return `溢价 ¥${(askingPrice - remainingCny).toFixed(2)}`;
+    if (askingPrice < remainingCny) return `剩余价值 ${(askingPrice / remainingCny * 10).toFixed(1)} 折`;
+    return '剩余价值出';
+  }
+
   function titlePricePreview(values, rate) {
     const askingPrice = effectiveAskingPrice(values, rate);
     if (!Number.isFinite(askingPrice) || askingPrice < 0) return '';
     const result = calculation(values);
     const remainingCny = result && rate ? result.value * rate.rate : null;
     const premium = parsePrice(values.askingPremium);
-    const total = `总价 ${formatPrice(askingPrice, '¥')}`;
-    if (Number.isFinite(premium)) return Number.isFinite(remainingCny) && remainingCny !== 0 ? `${total} · 溢价 ¥${premium.toFixed(2)}` : `溢价 ¥${premium.toFixed(2)}`;
-    if (!Number.isFinite(remainingCny) || remainingCny === 0) return `${total} · 溢价 ${formatPrice(askingPrice, '¥')}`;
-    if (askingPrice > remainingCny) return `${total} · 溢价 ¥${(askingPrice - remainingCny).toFixed(2)}`;
-    if (askingPrice < remainingCny) return `${total} · 剩余价值 ${(askingPrice / remainingCny * 10).toFixed(1)} 折`;
-    return `剩余价值 ¥${askingPrice} 出`;
+    const verdict = priceVerdict(askingPrice, premium, remainingCny);
+    if (verdict === '剩余价值出') return `剩余价值 ¥${askingPrice} 出`;
+    if (Number.isFinite(premium) && (!Number.isFinite(remainingCny) || remainingCny === 0)) return verdict;
+    return `总价 ${formatPrice(askingPrice, '¥')} · ${verdict}`;
   }
 
   function suggestedTitle(values, rate) {
@@ -1436,7 +1716,8 @@
           return;
         }
         const control = app.querySelector(`[name="${CSS.escape(name)}"]`);
-        if (control) control.value = value;
+        // 老草稿里存的是空值时，回落到字段默认项（比如续费周期默认月付），别把默认值冲掉。
+        if (control) control.value = value || MACHINE_FIELD_DEFAULTS[name] || '';
       });
     } catch (_) { /* 无效草稿时忽略 */ }
     try {
@@ -1629,6 +1910,28 @@
     return true;
   }
 
+  function insertEditorText(app, text) {
+    const content = String(text || '').trim();
+    if (!content) return false;
+    const target = editorTarget(app);
+    const codeMirror = target?.matches?.('.CodeMirror') ? target : target?.querySelector?.('.CodeMirror');
+    if (codeMirror?.CodeMirror && typeof codeMirror.CodeMirror.getValue === 'function' && typeof codeMirror.CodeMirror.setValue === 'function') {
+      const editor = codeMirror.CodeMirror;
+      const current = editor.getValue();
+      editor.setValue(`${current}${current.trim() ? (current.endsWith('\n') ? '\n' : '\n\n') : ''}${content}`);
+      editor.focus();
+      return true;
+    }
+    const textarea = target?.matches?.('textarea') ? target : target?.querySelector?.('textarea') || Array.from(document.querySelectorAll('#mde-title ~ textarea, textarea')).find((element) => !app.contains(element));
+    if (!textarea) return false;
+    const current = textarea.value;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(textarea, `${current}${current.trim() ? (current.endsWith('\n') ? '\n' : '\n\n') : ''}${content}`);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
   function selectTradeCategory() {
     const category = document.querySelector('#category');
     if (!category || category.value === 'trade') return;
@@ -1666,6 +1969,19 @@
   function closeModal(app) {
     app.classList.remove('nsit-open');
     app.querySelector('.nsit-modal').setAttribute('aria-hidden', 'true');
+  }
+
+  function openCalcModal(app) {
+    setCalcStatus(app, '');
+    app.classList.add('nsit-calc-open');
+    app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'false');
+    ensureRateTable(app);
+  }
+
+  function closeCalcModal(app) {
+    app.classList.remove('nsit-calc-open');
+    app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'true');
+    setCalcStatus(app, '');
   }
 
   function catalogApiUrl(path, params = null) {
