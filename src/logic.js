@@ -709,13 +709,118 @@
     const code = calcCurrencyCode(values.currency);
     const rate = crossRate(rateTable(app), code, 'CNY');
     const result = values.renewalAmount ? calculation({ ...values }) : null;
-    return { values, code, rate, result, remaining: result && Number.isFinite(rate) ? result.value * rate : null };
+    // 回本计算默认取续费价格（金额 + 币种 + 周期）；用户手动改过就不再覆盖，清空即不参与计算与回填。
+    const field = app.querySelector('.nsit-calc-modal [name="calcPaybackPrice"]');
+    const paybackCurrency = app.querySelector('.nsit-calc-modal [name="calcPaybackCurrency"]');
+    const paybackCycle = app.querySelector('.nsit-calc-modal [name="calcPaybackCycle"]');
+    if (field && paybackCurrency && paybackCycle && !field.dataset.nsitTouched) {
+      if (values.renewalAmount && field.value !== values.renewalAmount) field.value = values.renewalAmount;
+      if (values.currency && paybackCurrency.value !== values.currency) paybackCurrency.value = values.currency;
+      if (values.renewalCycle && paybackCycle.value !== values.renewalCycle) paybackCycle.value = values.renewalCycle;
+    }
+    // 回本计算可以选币种，内部一律折算成人民币再和剩余价值 / 预出价格比
+    const paybackCny = parsePrice(field?.value || '') * crossRate(rateTable(app), calcCurrencyCode(paybackCurrency?.value || ''), 'CNY');
+    return {
+      values, code, rate, result,
+      remaining: result && Number.isFinite(rate) ? result.value * rate : null,
+      paybackPrice: paybackCny,
+      paybackCycle: paybackCycle?.value.trim() || '',
+    };
+  }
+
+  // 回本：以「回本价格」（默认取续费金额折人民币）为投入，看按预出价格卖出后收回了多少成本。
+  // 用户改过回本价格（金额或币种）之后就不再跟随续费价格；清空则整块不参与计算与回填。
+  function markCalcPaybackTouched(app, target) {
+    if (!target.matches('[name="calcPaybackPrice"], [name="calcPaybackCurrency"], [name="calcPaybackCycle"]')) return;
+    const field = app.querySelector('.nsit-calc-modal [name="calcPaybackPrice"]');
+    if (field) field.dataset.nsitTouched = '1';
+  }
+
+  function refreshCalcPayback(app, state) {
+    const result = app.querySelector('[data-nsit-calc-payback-result]');
+    const verdict = app.querySelector('[data-nsit-calc-payback-verdict]');
+    const detail = app.querySelector('[data-nsit-calc-payback-detail]');
+    if (!verdict) return;
+    const summary = paybackSummary(state);
+    verdict.textContent = summary.verdict;
+    if (detail) detail.textContent = summary.detail;
+    if (result) { if (summary.tone) result.dataset.state = summary.tone; else delete result.dataset.state; }
+  }
+
+  // 周期按 365 天 / 12 个月折算成天数，用来把回本计算的价格摊到每天。
+  function cycleDaysOf(cycle) {
+    const months = CYCLE_MONTHS[String(cycle || '').trim()];
+    return months ? months * 365 / 12 : 0;
+  }
+
+  // 公式里的成本按周期说（年付 = 每年、月付 = 每月），不摊到天。
+  function paybackCycleLabel(cycle) {
+    const text = String(cycle || '').trim();
+    return text ? `每${text.replace(/付$/, '')}` : '';
+  }
+
+  // 回本计算的价格摊到每天 = 每天成本；预出价高出剩余价值的那部分（溢价）要赚多少天。
+  function paybackPerDay(state) {
+    const days = cycleDaysOf(state.paybackCycle);
+    return days > 0 ? state.paybackPrice / days : NaN;
+  }
+
+  function paybackDays(state, perDay) {
+    if (!Number.isFinite(perDay) || perDay <= 0) return NaN;
+    const base = paybackBase(state);
+    return Number.isFinite(base.amount) ? base.amount / perDay : NaN;
+  }
+
+  // 回本要赚回来的那笔钱：有剩余价值时用「预出价 − 剩余价值」（也就是溢价）；
+  // 剩余价值算不出来时（比如没填到期日期），就直接用填的预出总价，没填总价就用预出溢价。
+  function paybackBase(state) {
+    const { values, remaining } = state;
+    if (Number.isFinite(remaining) && remaining > 0) {
+      const asking = effectiveCalcAskingPrice(values, remaining);
+      return { amount: Number.isFinite(asking) ? asking - remaining : NaN, label: '溢价' };
+    }
+    const askingPrice = parsePrice(values.askingPrice);
+    if (Number.isFinite(askingPrice)) return { amount: askingPrice, label: '总价' };
+    return { amount: parsePrice(values.askingPremium), label: '溢价' };
+  }
+
+  // 回本周期不按天报：不足一年按月，超过一年按年。
+  function paybackDurationText(days) {
+    const round = (value, unit) => `${String(value.toFixed(1)).replace(/\.0$/, '')} ${unit}`;
+    return days < 365 ? round(days / 30, '个月') : round(days / 365, '年');
+  }
+
+  function paybackSummary(state) {
+    const price = state.paybackPrice;
+    if (!Number.isFinite(price) || price <= 0) return { verdict: '—', detail: '回本计算默认为续费价格' };
+    const perDay = paybackPerDay(state);
+    const costText = `${paybackCycleLabel(state.paybackCycle)} ¥${price.toFixed(2)}`;
+    if (!Number.isFinite(perDay)) return { verdict: `回本价 ¥${price.toFixed(2)}`, detail: '选择周期后可算回本' };
+    const days = paybackDays(state, perDay);
+    if (!Number.isFinite(days)) return { verdict: `回本价 ¥${price.toFixed(2)}`, detail: `${costText} · 填预出价格后可看回本` };
+    const base = paybackBase(state);
+    if (days <= 0) return { verdict: '不用回本', detail: `${costText} · 预出价没高过剩余价值`, tone: 'done' };
+    return { verdict: `约 ${paybackDurationText(days)}回本`, detail: `${base.label} ¥${base.amount.toFixed(2)} ÷ ${costText}` };
+  }
+
+  // 回填里的「回本周期」一行：周期 + 算式。算不出周期时（没填回本计算 / 没填预出价 / 没有溢价）不写。
+  function paybackLine(state) {
+    const perDay = paybackPerDay(state);
+    const days = paybackDays(state, perDay);
+    if (!Number.isFinite(days) || days <= 0) return '';
+    const base = paybackBase(state);
+    const costText = `${paybackCycleLabel(state.paybackCycle)} ¥${state.paybackPrice.toFixed(2)}`;
+    return `- 回本周期：${paybackDurationText(days)}（${base.label} ¥${base.amount.toFixed(2)} ÷ ${costText}）`;
   }
 
   // 回填文本照搬出鸡模板「续费与价值」那一段的结构；预出价格、溢价都可有可无。
   function remainingValueText(state) {
     const { values, code, rate, result, remaining } = state;
-    if (!result || !Number.isFinite(remaining)) return '';
+    // 剩余价值算不出来时（比如没填到期日期），回本周期算得出来的话就单独回填这一行
+    if (!result || !Number.isFinite(remaining)) {
+      const only = paybackLine(state);
+      return only ? `## 续费与价值\n${only}` : '';
+    }
     const symbol = currencySymbol(values.currency);
     const renewal = [
       values.renewalAmount ? `${symbol}${formatAmount(values.renewalAmount)}（${values.currency}）` : '',
@@ -732,6 +837,9 @@
     ].filter(Boolean);
     const askingPrice = effectiveCalcAskingPrice(values, remaining);
     if (Number.isFinite(askingPrice)) lines.push(`- 预出价格：¥${askingPrice.toFixed(2)}（${priceVerdict(askingPrice, parsePrice(values.askingPremium), remaining)}）`);
+    // 回本周期永远排在最后一行，接在预出价格后面。
+    const payback = paybackLine(state);
+    if (payback) lines.push(payback);
     return `## 续费与价值\n${lines.join('\n')}`;
   }
 
@@ -753,6 +861,7 @@
     if (progress) progress.style.width = result ? `${result.percentage}%` : '0%';
     if (progressTrack) progressTrack.hidden = !result;
     if (preview) renderPricePreview(preview, effectiveCalcAskingPrice(values, remaining), parsePrice(values.askingPremium), remaining, '预出价格可留空');
+    refreshCalcPayback(app, state);
     const text = remainingValueText(state);
     if (insert) insert.textContent = text || '—';
     if (button) button.disabled = !text;
@@ -812,8 +921,22 @@
 
   function refreshCalc(app) {
     if (!app.querySelector('.nsit-calc-modal')) return;
+    syncCalcPriceFields(app);
     refreshCalcRemaining(app, calcRemainingState(app));
     refreshCalcConvert(app);
+  }
+
+  // 预出总价和预出溢价互斥（和出鸡模板一致）：两个都填就清掉溢价；
+  // 填了其中一个，另一个就置灰不能再填。两个都留空仍然允许。
+  function syncCalcPriceFields(app) {
+    const asking = app.querySelector('.nsit-calc-modal [name="calcAskingPrice"]');
+    const premium = app.querySelector('.nsit-calc-modal [name="calcAskingPremium"]');
+    if (!asking || !premium) return;
+    const hasAsking = Number.isFinite(parsePrice(asking.value));
+    const hasPremium = Number.isFinite(parsePrice(premium.value));
+    if (hasAsking && hasPremium) premium.value = '';
+    asking.disabled = !hasAsking && hasPremium;
+    premium.disabled = hasAsking;
   }
 
   function fillCalcRemaining(app) {

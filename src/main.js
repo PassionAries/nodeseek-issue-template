@@ -78,6 +78,7 @@
           const index = calcAmountInputs(app).indexOf(event.target);
           if (index >= 0) app._nsitCalcBase = index;
         }
+        markCalcPaybackTouched(app, event.target);
         refreshCalc(app);
         return;
       }
@@ -156,6 +157,7 @@
     });
     app.addEventListener('change', (event) => {
       if (event.target.closest('.nsit-calc-modal')) {
+        markCalcPaybackTouched(app, event.target);
         refreshCalc(app);
         return;
       }
