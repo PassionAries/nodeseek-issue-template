@@ -31,6 +31,127 @@
     localStorage.setItem(PERSONALIZATION_KEY, JSON.stringify(settings));
   }
 
+  /* 功能开关 -----------------------------------------------------------------
+   * 只决定对应界面要不要出现：关掉后入口/标记会被移除，但监听、观察器和
+   * 后台请求照常运行，重新打开即恢复。改动即时生效，不需要刷新页面。
+   * ------------------------------------------------------------------------- */
+
+  let featureFlagCache = null;
+
+  function featureFlags() {
+    if (featureFlagCache) return featureFlagCache;
+    let saved = {};
+    try {
+      const parsed = JSON.parse(localStorage.getItem(FEATURE_FLAGS_KEY) || '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+    } catch (_) { /* 配置损坏时按默认全开 */ }
+    featureFlagCache = { ...DEFAULT_FEATURE_FLAGS, ...saved };
+    return featureFlagCache;
+  }
+
+  function featureEnabled(key) {
+    return featureFlags()[key] !== false;
+  }
+
+  function saveFeatureFlags(flags) {
+    featureFlagCache = { ...DEFAULT_FEATURE_FLAGS, ...flags };
+    try {
+      localStorage.setItem(FEATURE_FLAGS_KEY, JSON.stringify(featureFlagCache));
+    } catch (_) { /* 存储不可用时仅本次生效 */ }
+  }
+
+  function featureFlagDialog() {
+    return document.querySelector('.nsit-flag-modal');
+  }
+
+  function syncFeatureFlagDialog() {
+    const flags = featureFlags();
+    document.querySelectorAll('[data-nsit-flag]').forEach((input) => { input.checked = flags[input.dataset.nsitFlag] !== false; });
+  }
+
+  // 功能开关弹窗跟「个性化设置」同壳，挂在 #nsit-app 里，所以显隐由 app 上的类控制。
+  // 列表页没有编辑器、不会建 #nsit-app；菜单要能在任何页面打开设置，
+  // 这时临时建一个空壳（不显示任何模板入口）来承载这个弹窗。
+  function featureFlagHost() {
+    const existing = document.querySelector(`#${APP_ID}`);
+    if (existing) return existing;
+    const host = createApp({ replyMode: true });
+    host.dataset.nsitFlagHost = '';
+    host.querySelectorAll('.nsit-trigger, .nsit-buy-trigger, .nsit-calc-trigger').forEach((button) => { button.style.display = 'none'; });
+    document.body.append(host);
+    wireFeatureFlagDialog(host);
+    return host;
+  }
+
+  // 开关弹窗的交互自己挂：列表页的宿主是 createApp 直接建的，不会走 initialize() 里的统一接线，
+  // 不然弹窗里的勾选和按钮全都点不动。
+  function wireFeatureFlagDialog(app) {
+    const modal = app.querySelector('.nsit-flag-modal');
+    if (!modal || modal.dataset.nsitWired) return;
+    modal.dataset.nsitWired = '1';
+    modal.addEventListener('change', (event) => {
+      const flag = event.target.closest('[data-nsit-flag]');
+      if (flag) toggleFeatureFlag(flag);
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target.closest('[data-action="close-flags"]')) { closeFeatureFlagDialog(app); return; }
+      if (event.target.closest('[data-action="reset-flags"]')) { resetFeatureFlags(app); return; }
+      if (event.target === modal) closeFeatureFlagDialog(app);
+    });
+  }
+
+  function openFeatureFlagDialog(app) {
+    if (!app) return;
+    syncFeatureFlagDialog(app);
+    app.classList.add('nsit-flag-open');
+    featureFlagDialog()?.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeFeatureFlagDialog(app) {
+    app.classList.remove('nsit-flag-open');
+    featureFlagDialog()?.setAttribute('aria-hidden', 'true');
+  }
+
+  function toggleFeatureFlag(input) {
+    saveFeatureFlags({ ...featureFlags(), [input.dataset.nsitFlag]: input.checked });
+    applyFeatureFlags();
+  }
+
+  function resetFeatureFlags(app) {
+    saveFeatureFlags(DEFAULT_FEATURE_FLAGS);
+    syncFeatureFlagDialog(app);
+    applyFeatureFlags();
+  }
+
+  // 开关变化后按新状态重画各处界面：这些渲染函数都是幂等的，开着会补上、关掉会移除。
+  function applyFeatureFlags() {
+    const app = document.querySelector(`#${APP_ID}`);
+    if (app) applyEditorFeatureFlags(app);
+    renderLuckyTrigger();
+    renderLuckyNotifyEntries();
+    renderLuckyAnnounceButton();
+    renderTradeStatusActions();
+    renderRepliedPostMenu();
+    renderRepliedPostLabels();
+    ensurePostFilterTrigger();
+    filterPostListItems();
+  }
+
+  // 编辑器里的三个入口共用一个 #nsit-app，所以只切按钮显隐，不重建弹窗。
+  // 用内联 display：脚本自己的 .nsit-trigger{display:inline} 会盖过 [hidden]。
+  function applyEditorFeatureFlags(app) {
+    // 临时宿主（列表页用来承载设置弹窗的空壳）不该露出任何模板入口
+    if (app.dataset.nsitFlagHost !== undefined) return;
+    [
+      ['editorTemplates', '.nsit-trigger:not(.nsit-buy-trigger):not(.nsit-calc-trigger)'],
+      ['buyTemplate', '.nsit-buy-trigger'],
+      ['calculator', '.nsit-calc-trigger'],
+    ].forEach(([key, selector]) => {
+      const button = app.querySelector(selector);
+      if (button) button.style.display = featureEnabled(key) ? '' : 'none';
+    });
+  }
+
   function compressValueCardBackground(file) {
     return new Promise((resolve, reject) => {
       if (!file?.type.startsWith('image/')) { reject(new Error('请选择图片文件')); return; }
@@ -2130,6 +2251,10 @@
   function renderTradeStatusActions() {
     const context = tradePostContext();
     const existing = document.querySelector('[data-nsit-trade-status-actions]');
+    if (!featureEnabled('tradeStatus')) {
+      existing?.remove();
+      return;
+    }
     if (!context || document.querySelector('#mde-title') || (context.type === 'sell' ? /已出|不出/.test(context.title) : /已收|不收/.test(context.title))) {
       existing?.remove();
       return;
@@ -2425,6 +2550,11 @@
   }
 
   function ensurePostFilterTrigger() {
+    if (!featureEnabled('postFilter')) {
+      document.querySelector('[data-nsit-post-filter-trigger]')?.remove();
+      document.querySelector('[data-nsit-post-filter-panel]')?.remove();
+      return;
+    }
     const head = document.querySelector('#nsk-head');
     if (!head || head.querySelector('[data-nsit-post-filter-trigger]')) return;
     let group = head.querySelector('[data-nsit-post-filter-icon-group]');
@@ -2453,6 +2583,10 @@
   }
 
   function renderRepliedPostLabels() {
+    if (!featureEnabled('repliedPosts')) {
+      document.querySelectorAll('[data-nsit-replied-post-label]').forEach((label) => label.remove());
+      return;
+    }
     let posts = {};
     const storageKey = repliedPostsStorageKey();
     if (!storageKey) return;
@@ -2500,7 +2634,7 @@
     const postId = currentPostId();
     const menu = document.querySelector('.comment-menu');
     const current = document.querySelector('[data-nsit-replied-post-menu]');
-    const floors = postId ? repliedFloors(postId) : [];
+    const floors = postId && featureEnabled('repliedPosts') ? repliedFloors(postId) : [];
     if (!menu || !floors.length) {
       current?.remove();
       return;
@@ -3225,7 +3359,7 @@
   function renderLuckyTrigger() {
     const submit = luckyEditorPage() ? luckySubmitButton() : null;
     const trigger = luckyTriggerButton();
-    if (!submit) {
+    if (!submit || !featureEnabled('lucky')) {
       trigger?.remove();
       return;
     }
@@ -4175,7 +4309,10 @@
   ];
 
   function renderLuckyNotifyEntries() {
-    if (!luckyNotifyTopFrame()) return;
+    if (!luckyNotifyTopFrame() || !featureEnabled('lucky')) {
+      document.querySelectorAll('[data-nsit-lucky-notify]').forEach((node) => node.remove());
+      return;
+    }
     const panel = luckyNotifyPanel();
     if (!panel || !currentNodeSeekUserId()) {
       document.querySelectorAll('[data-nsit-lucky-notify]').forEach((node) => node.remove());
@@ -4701,7 +4838,7 @@
   function renderLuckyAnnounceButton() {
     if (!luckyNotifyTopFrame()) return;
     const existing = document.querySelector('[data-nsit-lucky-announce]');
-    const context = luckyAnnounceContext();
+    const context = featureEnabled('lucky') ? luckyAnnounceContext() : null;
     if (!context) {
       existing?.remove();
       return;

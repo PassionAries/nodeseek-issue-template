@@ -1,5 +1,5 @@
   const APP_ID = 'nsit-app';
-  const VERSION = '1.4.44';
+  const VERSION = '1.4.45';
   const NODEIMAGE_KEY = 'nsit-nodeimage-api-key';
   const RUNTIME_KEY = '__nodeSeekIssueTemplatesRuntime__';
   const STORAGE_KEY = 'nsit-single-server-draft-v1';
@@ -8,6 +8,18 @@
   const TG_CONTACT_KEY = 'nsit-tg-contact-v1';
   const CARD_TOGGLE_KEY = 'nsit-generate-value-card';
   const PERSONALIZATION_KEY = 'nsit-personalization-v1';
+  const FEATURE_FLAGS_KEY = 'nsit-feature-flags-v1';
+  // 功能开关：只决定对应界面要不要出现，后台逻辑照常运行。键不存在时按开启处理。
+  const FEATURE_FLAGS = [
+    ['editorTemplates', '出鸡模板', '发帖 / 回帖编辑器里的「出🐔模板」入口'],
+    ['buyTemplate', '收鸡模板', '编辑器里的「收🐔模板」入口'],
+    ['calculator', '剩余价值计算', '回帖 / 私信编辑器里的计算器入口'],
+    ['lucky', '抽奖', '编辑器里的「抽奖配置」、抽奖 / 中奖记录与开奖公告'],
+    ['tradeStatus', '交易状态', '帖子页 #0 楼旁的「已出 / 已收」按钮'],
+    ['repliedPosts', '我的回复', '帖子页和列表页的回复楼层标记'],
+    ['postFilter', '关键字过滤', '列表页的关键字过滤入口'],
+  ];
+  const DEFAULT_FEATURE_FLAGS = Object.fromEntries(FEATURE_FLAGS.map(([key]) => [key, true]));
   const REPLIED_POSTS_STORAGE_KEY = 'nsit-replied-posts-v1';
   const POST_FILTER_RULES_STORAGE_KEY = 'nsit-post-filter-rules-v1';
   const POST_FILTER_RUNTIME_KEY = '__nodeSeekIssueTemplatesPostFilters__';

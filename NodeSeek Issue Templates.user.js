@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NodeSeek Issue Templates
 // @namespace    https://www.nodeseek.com/
-// @version      1.4.45
+// @version      1.4.46
 // @description  在 NodeSeek 发帖或编辑帖页面用表单生成交易帖，并回填 Markdown 编辑器。
 // @author       vico
 // @updateURL    https://github.com/ruoqianfengshao/nodeseek-issue-template/releases/latest/download/NodeSeek.Issue.Templates.min.user.js
@@ -11,6 +11,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_addStyle
+// @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // @connect      api.nodeimage.com
 // @connect      *.workers.dev
@@ -21,7 +22,7 @@
   'use strict';
 
 const APP_ID = 'nsit-app';
-  const VERSION = '1.4.44';
+  const VERSION = '1.4.45';
   const NODEIMAGE_KEY = 'nsit-nodeimage-api-key';
   const RUNTIME_KEY = '__nodeSeekIssueTemplatesRuntime__';
   const STORAGE_KEY = 'nsit-single-server-draft-v1';
@@ -30,6 +31,18 @@ const APP_ID = 'nsit-app';
   const TG_CONTACT_KEY = 'nsit-tg-contact-v1';
   const CARD_TOGGLE_KEY = 'nsit-generate-value-card';
   const PERSONALIZATION_KEY = 'nsit-personalization-v1';
+  const FEATURE_FLAGS_KEY = 'nsit-feature-flags-v1';
+  // 功能开关：只决定对应界面要不要出现，后台逻辑照常运行。键不存在时按开启处理。
+  const FEATURE_FLAGS = [
+    ['editorTemplates', '出鸡模板', '发帖 / 回帖编辑器里的「出🐔模板」入口'],
+    ['buyTemplate', '收鸡模板', '编辑器里的「收🐔模板」入口'],
+    ['calculator', '剩余价值计算', '回帖 / 私信编辑器里的计算器入口'],
+    ['lucky', '抽奖', '编辑器里的「抽奖配置」、抽奖 / 中奖记录与开奖公告'],
+    ['tradeStatus', '交易状态', '帖子页 #0 楼旁的「已出 / 已收」按钮'],
+    ['repliedPosts', '我的回复', '帖子页和列表页的回复楼层标记'],
+    ['postFilter', '关键字过滤', '列表页的关键字过滤入口'],
+  ];
+  const DEFAULT_FEATURE_FLAGS = Object.fromEntries(FEATURE_FLAGS.map(([key]) => [key, true]));
   const REPLIED_POSTS_STORAGE_KEY = 'nsit-replied-posts-v1';
   const POST_FILTER_RULES_STORAGE_KEY = 'nsit-post-filter-rules-v1';
   const POST_FILTER_RUNTIME_KEY = '__nodeSeekIssueTemplatesPostFilters__';
@@ -309,6 +322,18 @@ function escapeHtml(value) {
       ? `<button type="button" class="nsit-calc-rate-remove" data-action="remove-calc-currency" aria-label="移除该币种" title="移除">${calcRemoveIcon()}</button>`
       : '<span class="nsit-calc-rate-gap" aria-hidden="true"></span>';
     return `<div class="nsit-calc-rate-row">${remove}<span class="nsit-picker nsit-currency-picker" data-picker-name="calcTargetCurrency"><input value="${escapeHtml(currency)}" readonly aria-label="币种" data-nsit-picker-input="true" data-nsit-calc-target-input="true" role="combobox" aria-autocomplete="none" aria-expanded="false"><button type="button" class="nsit-picker-toggle" aria-label="选择币种" aria-expanded="false"><i></i></button><span class="nsit-picker-menu">${calcCurrencyOptions()}</span></span><input class="nsit-calc-rate-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="金额" data-nsit-calc-amount${amount ? ` value="${escapeHtml(amount)}"` : ''}><small class="nsit-calc-rate-line" data-nsit-calc-rate-line></small></div>`;
+  }
+
+  // 功能开关沿用「个性化设置」那套弹窗外壳（同一组类名与样式），只额外放一列开关。
+  function featureFlagDialogMarkup() {
+    const items = FEATURE_FLAGS.map(([key, label, description]) => `<label class="nsit-flag-item"><input type="checkbox" data-nsit-flag="${key}"><span><b>${escapeHtml(label)}</b><small>${escapeHtml(description)}</small></span></label>`).join('');
+    return `<div class="nsit-personalization-modal nsit-flag-modal" aria-hidden="true"><section class="nsit-personalization-dialog" role="dialog" aria-modal="true" aria-label="功能开关"><header class="nsit-personalization-head"><div><h3>功能开关</h3>${starNoteMarkup()}</div><button type="button" class="nsit-close" data-action="close-flags" aria-label="关闭功能开关">×</button></header><div data-nsit-flag-body><div class="nsit-personalization-form"><div class="nsit-personalization-content"><section><div class="nsit-setting-label"><h4>显示哪些功能</h4></div><div class="nsit-flag-list">${items}</div></section></div><footer><button type="button" data-action="reset-flags">全部开启</button><button type="button" class="nsit-primary" data-action="close-flags">完成</button></footer></div></div></section></div>`;
+  }
+
+  function featureFlagStyles() {
+    // 统一弹窗是固定 720px 高，开关只有几行，会留一大片空白；这里让它按内容自适应
+    // （只覆盖这一个弹窗；flex 基线改成 auto，否则链式 flex:1 1 0 在 auto 高度里会塌成 0）。
+    return `#${APP_ID} .nsit-flag-modal .nsit-personalization-dialog{height:auto}#${APP_ID} .nsit-flag-modal [data-nsit-flag-body],#${APP_ID} .nsit-flag-modal .nsit-personalization-form,#${APP_ID} .nsit-flag-modal .nsit-personalization-content{flex:1 1 auto}#${APP_ID} [data-nsit-flag-body]{display:flex;min-height:0;overflow:hidden}#${APP_ID} .nsit-flag-modal .nsit-personalization-head small.nsit-star-note{font-size:14px}#${APP_ID} .nsit-flag-list{display:grid;gap:2px}#${APP_ID} .nsit-flag-item{display:flex;align-items:flex-start;gap:9px;padding:7px 0;cursor:pointer}#${APP_ID} .nsit-flag-item+.nsit-flag-item{border-top:1px solid var(--nsit-line-soft)}#${APP_ID} .nsit-flag-item input{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--nsit-accent)}#${APP_ID} .nsit-flag-item>span{display:grid;gap:2px;min-width:0}#${APP_ID} .nsit-flag-item b{color:var(--nsit-ink);font-size:14px;font-weight:600}#${APP_ID} .nsit-flag-item small{color:var(--nsit-muted);font-size:12px}#${APP_ID}.nsit-flag-open .nsit-flag-modal{display:grid;place-items:center}`;
   }
 
   function calcModalMarkup() {
@@ -773,6 +798,7 @@ function escapeHtml(value) {
     injectStyles(`${styles}\n${modelSuggestionStyles}\n#${APP_ID} .nsit-buy-shell{--nsit-accent:var(--nsit-info)}#${APP_ID} .nsit-buy-shell .nsit-head{background:linear-gradient(110deg,var(--nsit-head-from-2),var(--nsit-info-soft))}#${APP_ID} .nsit-buy-shell .nsit-star-note a,#${APP_ID} .nsit-buy-shell .nsit-personalization-trigger{color:var(--nsit-info)}#${APP_ID} .nsit-buy-shell .nsit-personalization-trigger:hover{background:var(--nsit-info-soft);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-shell button:hover{border-color:var(--nsit-info);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-shell button.nsit-primary,#${APP_ID} .nsit-buy-shell button.nsit-primary:hover{border-color:var(--nsit-info);background:var(--nsit-info);color:var(--nsit-on-accent)}#${APP_ID} .nsit-buy-shell button.nsit-primary:hover{background:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-shell input:not([type="radio"]):focus,#${APP_ID} .nsit-buy-shell textarea:focus{border-color:var(--nsit-info);box-shadow:0 0 0 3px var(--nsit-info-ring)}#${APP_ID} .nsit-buy-personalization-modal{--nsit-accent:var(--nsit-info)}#${APP_ID} .nsit-buy-personalization-modal button:hover{border-color:var(--nsit-info);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-personalization-modal button.nsit-primary{border-color:var(--nsit-info);background:var(--nsit-info);color:var(--nsit-on-accent)}#${APP_ID} .nsit-buy-personalization-modal button.nsit-primary:hover{background:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-personalization-modal input:focus{border-color:var(--nsit-info);box-shadow:0 0 0 3px var(--nsit-info-ring)}#${APP_ID} .nsit-buy-personalization-modal .nsit-title-preview{border-color:var(--nsit-info-line-2);background:var(--nsit-info-soft);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-personalization-modal .nsit-tag--transfer input:checked+span{border-color:var(--nsit-tag-transfer-line);background:var(--nsit-tag-transfer-soft);color:var(--nsit-tag-transfer-ink)}#${APP_ID} .nsit-buy-price-option{justify-self:start;background:transparent!important;text-align:left}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked){background:transparent!important;color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-price{gap:5px}#${APP_ID} .nsit-buy-price-option input[type="radio"]{appearance:auto;width:15px;height:15px;border:initial;border-radius:initial;background:initial;accent-color:var(--nsit-info);box-shadow:none}#${APP_ID} .nsit-buy-price-option input[type="radio"]:checked{background:initial}#${APP_ID} .nsit-buy-price-option input[name^="buyPriceValue-"]{height:30px;border:0;border-bottom:1px solid var(--nsit-knob-off);border-radius:0;background:transparent;box-shadow:none;font-size:14px}#${APP_ID} .nsit-buy-price-option>span,#${APP_ID} .nsit-buy-price-option>em{display:flex;align-items:center;height:30px;line-height:30px}#${APP_ID} .nsit-buy-price-option input[name^="buyPriceValue-"]::placeholder{font-size:14px}#${APP_ID} .nsit-buy-price-option input[name^="buyPriceValue-"]:focus{border:0;border-bottom:1px solid var(--nsit-info);box-shadow:none}#${APP_ID} .nsit-buy-price-option input[type="radio"]:focus{outline:0;box-shadow:none}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked)>span,#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked)>em,#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked) input[name^="buyPriceValue-"]{color:var(--nsit-info-ink);background:transparent;box-shadow:none}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked) input[name^="buyPriceValue-"]{border:0;border-bottom:1px solid var(--nsit-info)}#${APP_ID} .nsit-buy-contact-grid{grid-template-columns:repeat(4,minmax(0,1fr))}#${APP_ID} .nsit-buy-tags-field{grid-column:span 3}#${APP_ID} .nsit-buy-catalog>label{margin:6px 0;padding:0 10px}#${APP_ID} .nsit-buy-contact-grid+.nsit-buy-grid{margin-top:10px}#${APP_ID} .nsit-buy-shell .nsit-actions{margin-left:auto}`);
     injectStyles(`.message-input .mde-toolbar>#${APP_ID} .nsit-trigger{align-self:center;flex:none;margin:0 4px 0 0;white-space:nowrap}.message-input .mde-toolbar>#${APP_ID} .nsit-trigger:first-child{margin-left:auto}`);
     injectStyles(`#${APP_ID} .nsit-tag--contact input:checked+span{border-color:var(--nsit-tag-contact-line);background:var(--nsit-tag-contact-soft);color:var(--nsit-tag-contact-ink)}`);
+    injectStyles(featureFlagStyles());
     injectStyles(`#${APP_ID} .nsit-trigger.nsit-calc-trigger{border-color:var(--nsit-ok-line);background:var(--nsit-ok-soft);color:var(--nsit-ok-ink)}#${APP_ID} .nsit-trigger.nsit-calc-trigger:hover{border-color:var(--nsit-ok);background:var(--nsit-ok);color:var(--nsit-on-accent)}#${APP_ID} .nsit-calc-modal{display:none;position:fixed;z-index:2147483647;inset:0;overflow:auto;padding:28px 16px;background:var(--nsit-scrim)}#${APP_ID}.nsit-calc-open .nsit-calc-modal{display:grid;place-items:center}#${APP_ID} .nsit-calc-dialog{display:flex;flex-direction:column;width:min(1180px,100%);max-height:calc(100vh - 56px);border:1px solid var(--nsit-line);border-radius:12px;background:var(--nsit-surface);box-shadow:0 20px 60px var(--nsit-shadow-2);overflow:hidden}#${APP_ID} .nsit-calc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 18px;border-bottom:1px solid var(--nsit-line);background:linear-gradient(110deg,var(--nsit-head-from),var(--nsit-accent-soft))}#${APP_ID} .nsit-calc-head-copy{display:flex;align-items:baseline;gap:9px;min-width:0}#${APP_ID} .nsit-calc-head-copy h3{font-size:16px}#${APP_ID} .nsit-calc-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-height:0;overflow:auto}#${APP_ID} .nsit-calc-panel{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px 18px}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-panel h4{margin:0;color:var(--nsit-ink);font-size:15px}#${APP_ID} .nsit-calc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px}#${APP_ID} .nsit-calc-panel-head button{width:auto;height:auto;margin:0;padding:0;border:0;background:transparent;color:var(--nsit-ok-ink);font-size:16px;line-height:1;cursor:pointer}#${APP_ID} .nsit-calc-hint{margin:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-value-card{margin:0}#${APP_ID} .nsit-calc-value-card .nsit-value-row-two{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr)}#${APP_ID} .nsit-calc-value-card .nsit-value-heading{flex-wrap:wrap;gap:6px 10px}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>span:first-child{white-space:nowrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:3;width:100%;margin-right:0}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>.nsit-rate-value strong{font-size:12px}#${APP_ID} .nsit-calc-value-card .nsit-value-stats strong{font-size:13px}#${APP_ID} .nsit-calc-value-card .nsit-value{font-size:30px}#${APP_ID} .nsit-calc-value-card .nsit-value-result .nsit-price-preview{font-size:15px}#${APP_ID} .nsit-calc-value-card .nsit-price-preview b{font-size:24px}#${APP_ID} .nsit-calc-progress{display:block;flex:none;width:62px;height:6px;overflow:hidden;border-radius:999px;background:var(--nsit-progress-track)}#${APP_ID} .nsit-calc-progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nsit-progress-from),var(--nsit-progress-to));transition:width .15s ease}#${APP_ID} .nsit-calc-rates{display:grid;gap:10px}#${APP_ID} .nsit-calc-rate-row{display:grid;grid-template-columns:24px 132px 166px minmax(0,1fr);align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--nsit-raised)}#${APP_ID} .nsit-calc-rate-row .nsit-picker input{padding:6px 26px 6px 8px;font-size:13px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle{right:5px;width:16px;height:16px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle i{width:14px;height:14px;background-size:14px 14px}#${APP_ID} .nsit-calc-rate-row .nsit-calc-rate-amount{padding:6px 8px;text-align:right;font-size:15px;font-weight:650}#${APP_ID} .nsit-calc-rate-remove{display:grid;place-items:center;width:24px;height:24px;margin:0;padding:0;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--nsit-muted);cursor:pointer}#${APP_ID} .nsit-calc-rate-remove:hover{color:var(--nsit-danger)}#${APP_ID} .nsit-calc-rate-remove svg{width:20px;height:20px;fill:currentColor}#${APP_ID} .nsit-calc-rate-gap{display:block}#${APP_ID} .nsit-calc-rate-line{min-width:0;overflow:hidden;color:var(--nsit-muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap}#${APP_ID} .nsit-calc-add{border-style:dashed;color:var(--nsit-ok-ink)}#${APP_ID} .nsit-calc-insert{padding:8px 10px;border:1px dashed var(--nsit-line-strong);border-radius:8px;background:var(--nsit-sunken);color:var(--nsit-muted-2);font-size:13px;line-height:1.5;word-break:break-all}#${APP_ID} .nsit-calc-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-top:1px solid var(--nsit-line);background:var(--nsit-surface);box-shadow:0 -8px 18px var(--nsit-shadow-soft-6)}#${APP_ID} .nsit-calc-foot-cell{display:flex;justify-content:flex-end;padding:12px 18px}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-status{grid-column:1/-1;padding:0 18px;color:var(--nsit-muted);font-size:13px;text-align:right}#${APP_ID} .nsit-calc-status:empty{display:none}#${APP_ID} .nsit-calc-status:not(:empty){padding-bottom:12px}@media(max-width:1080px){#${APP_ID} .nsit-calc-body{grid-template-columns:1fr}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-top:1px solid var(--nsit-line);border-left:0}#${APP_ID} .nsit-calc-foot{grid-template-columns:1fr}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-top:1px solid var(--nsit-line);border-left:0}}`);
     // 剩余价值的回填预览是多行文本，保留换行。
     injectStyles(`#${APP_ID} .nsit-calc-insert{white-space:pre-wrap}`);
@@ -815,6 +841,7 @@ function escapeHtml(value) {
       </div>
       <div class="nsit-personalization-modal" aria-hidden="true"><section class="nsit-personalization-dialog" role="dialog" aria-modal="true" aria-label="个性化配置"><header class="nsit-personalization-head"><div><h3>个性化配置</h3><small>仅保存到当前浏览器本地</small></div><button type="button" class="nsit-close" data-action="close-personalization" aria-label="关闭个性化配置">×</button></header><div data-nsit-personalization-body></div></section></div>
       <div class="nsit-buy-personalization-modal" aria-hidden="true"><section class="nsit-personalization-dialog" role="dialog" aria-modal="true" aria-label="收鸡个性化配置"><header class="nsit-personalization-head"><div><h3>收鸡个性化配置</h3><small>仅保存到当前浏览器本地</small></div><button type="button" class="nsit-close" data-action="close-buy-personalization" aria-label="关闭收鸡个性化配置">×</button></header><div data-nsit-buy-personalization-body></div></section></div>
+      ${featureFlagDialogMarkup()}
       ${replyMode ? calcModalMarkup() : ''}
       `;
     const personalizationIcon = app.querySelector('[data-action="open-personalization"] svg');
@@ -994,6 +1021,127 @@ function formValues(app) {
 
   function savePersonalSettings(settings) {
     localStorage.setItem(PERSONALIZATION_KEY, JSON.stringify(settings));
+  }
+
+  /* 功能开关 -----------------------------------------------------------------
+   * 只决定对应界面要不要出现：关掉后入口/标记会被移除，但监听、观察器和
+   * 后台请求照常运行，重新打开即恢复。改动即时生效，不需要刷新页面。
+   * ------------------------------------------------------------------------- */
+
+  let featureFlagCache = null;
+
+  function featureFlags() {
+    if (featureFlagCache) return featureFlagCache;
+    let saved = {};
+    try {
+      const parsed = JSON.parse(localStorage.getItem(FEATURE_FLAGS_KEY) || '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed;
+    } catch (_) { /* 配置损坏时按默认全开 */ }
+    featureFlagCache = { ...DEFAULT_FEATURE_FLAGS, ...saved };
+    return featureFlagCache;
+  }
+
+  function featureEnabled(key) {
+    return featureFlags()[key] !== false;
+  }
+
+  function saveFeatureFlags(flags) {
+    featureFlagCache = { ...DEFAULT_FEATURE_FLAGS, ...flags };
+    try {
+      localStorage.setItem(FEATURE_FLAGS_KEY, JSON.stringify(featureFlagCache));
+    } catch (_) { /* 存储不可用时仅本次生效 */ }
+  }
+
+  function featureFlagDialog() {
+    return document.querySelector('.nsit-flag-modal');
+  }
+
+  function syncFeatureFlagDialog() {
+    const flags = featureFlags();
+    document.querySelectorAll('[data-nsit-flag]').forEach((input) => { input.checked = flags[input.dataset.nsitFlag] !== false; });
+  }
+
+  // 功能开关弹窗跟「个性化设置」同壳，挂在 #nsit-app 里，所以显隐由 app 上的类控制。
+  // 列表页没有编辑器、不会建 #nsit-app；菜单要能在任何页面打开设置，
+  // 这时临时建一个空壳（不显示任何模板入口）来承载这个弹窗。
+  function featureFlagHost() {
+    const existing = document.querySelector(`#${APP_ID}`);
+    if (existing) return existing;
+    const host = createApp({ replyMode: true });
+    host.dataset.nsitFlagHost = '';
+    host.querySelectorAll('.nsit-trigger, .nsit-buy-trigger, .nsit-calc-trigger').forEach((button) => { button.style.display = 'none'; });
+    document.body.append(host);
+    wireFeatureFlagDialog(host);
+    return host;
+  }
+
+  // 开关弹窗的交互自己挂：列表页的宿主是 createApp 直接建的，不会走 initialize() 里的统一接线，
+  // 不然弹窗里的勾选和按钮全都点不动。
+  function wireFeatureFlagDialog(app) {
+    const modal = app.querySelector('.nsit-flag-modal');
+    if (!modal || modal.dataset.nsitWired) return;
+    modal.dataset.nsitWired = '1';
+    modal.addEventListener('change', (event) => {
+      const flag = event.target.closest('[data-nsit-flag]');
+      if (flag) toggleFeatureFlag(flag);
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target.closest('[data-action="close-flags"]')) { closeFeatureFlagDialog(app); return; }
+      if (event.target.closest('[data-action="reset-flags"]')) { resetFeatureFlags(app); return; }
+      if (event.target === modal) closeFeatureFlagDialog(app);
+    });
+  }
+
+  function openFeatureFlagDialog(app) {
+    if (!app) return;
+    syncFeatureFlagDialog(app);
+    app.classList.add('nsit-flag-open');
+    featureFlagDialog()?.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeFeatureFlagDialog(app) {
+    app.classList.remove('nsit-flag-open');
+    featureFlagDialog()?.setAttribute('aria-hidden', 'true');
+  }
+
+  function toggleFeatureFlag(input) {
+    saveFeatureFlags({ ...featureFlags(), [input.dataset.nsitFlag]: input.checked });
+    applyFeatureFlags();
+  }
+
+  function resetFeatureFlags(app) {
+    saveFeatureFlags(DEFAULT_FEATURE_FLAGS);
+    syncFeatureFlagDialog(app);
+    applyFeatureFlags();
+  }
+
+  // 开关变化后按新状态重画各处界面：这些渲染函数都是幂等的，开着会补上、关掉会移除。
+  function applyFeatureFlags() {
+    const app = document.querySelector(`#${APP_ID}`);
+    if (app) applyEditorFeatureFlags(app);
+    renderLuckyTrigger();
+    renderLuckyNotifyEntries();
+    renderLuckyAnnounceButton();
+    renderTradeStatusActions();
+    renderRepliedPostMenu();
+    renderRepliedPostLabels();
+    ensurePostFilterTrigger();
+    filterPostListItems();
+  }
+
+  // 编辑器里的三个入口共用一个 #nsit-app，所以只切按钮显隐，不重建弹窗。
+  // 用内联 display：脚本自己的 .nsit-trigger{display:inline} 会盖过 [hidden]。
+  function applyEditorFeatureFlags(app) {
+    // 临时宿主（列表页用来承载设置弹窗的空壳）不该露出任何模板入口
+    if (app.dataset.nsitFlagHost !== undefined) return;
+    [
+      ['editorTemplates', '.nsit-trigger:not(.nsit-buy-trigger):not(.nsit-calc-trigger)'],
+      ['buyTemplate', '.nsit-buy-trigger'],
+      ['calculator', '.nsit-calc-trigger'],
+    ].forEach(([key, selector]) => {
+      const button = app.querySelector(selector);
+      if (button) button.style.display = featureEnabled(key) ? '' : 'none';
+    });
   }
 
   function compressValueCardBackground(file) {
@@ -3095,6 +3243,10 @@ function formValues(app) {
   function renderTradeStatusActions() {
     const context = tradePostContext();
     const existing = document.querySelector('[data-nsit-trade-status-actions]');
+    if (!featureEnabled('tradeStatus')) {
+      existing?.remove();
+      return;
+    }
     if (!context || document.querySelector('#mde-title') || (context.type === 'sell' ? /已出|不出/.test(context.title) : /已收|不收/.test(context.title))) {
       existing?.remove();
       return;
@@ -3390,6 +3542,11 @@ function formValues(app) {
   }
 
   function ensurePostFilterTrigger() {
+    if (!featureEnabled('postFilter')) {
+      document.querySelector('[data-nsit-post-filter-trigger]')?.remove();
+      document.querySelector('[data-nsit-post-filter-panel]')?.remove();
+      return;
+    }
     const head = document.querySelector('#nsk-head');
     if (!head || head.querySelector('[data-nsit-post-filter-trigger]')) return;
     let group = head.querySelector('[data-nsit-post-filter-icon-group]');
@@ -3418,6 +3575,10 @@ function formValues(app) {
   }
 
   function renderRepliedPostLabels() {
+    if (!featureEnabled('repliedPosts')) {
+      document.querySelectorAll('[data-nsit-replied-post-label]').forEach((label) => label.remove());
+      return;
+    }
     let posts = {};
     const storageKey = repliedPostsStorageKey();
     if (!storageKey) return;
@@ -3465,7 +3626,7 @@ function formValues(app) {
     const postId = currentPostId();
     const menu = document.querySelector('.comment-menu');
     const current = document.querySelector('[data-nsit-replied-post-menu]');
-    const floors = postId ? repliedFloors(postId) : [];
+    const floors = postId && featureEnabled('repliedPosts') ? repliedFloors(postId) : [];
     if (!menu || !floors.length) {
       current?.remove();
       return;
@@ -4190,7 +4351,7 @@ function formValues(app) {
   function renderLuckyTrigger() {
     const submit = luckyEditorPage() ? luckySubmitButton() : null;
     const trigger = luckyTriggerButton();
-    if (!submit) {
+    if (!submit || !featureEnabled('lucky')) {
       trigger?.remove();
       return;
     }
@@ -5140,7 +5301,10 @@ function formValues(app) {
   ];
 
   function renderLuckyNotifyEntries() {
-    if (!luckyNotifyTopFrame()) return;
+    if (!luckyNotifyTopFrame() || !featureEnabled('lucky')) {
+      document.querySelectorAll('[data-nsit-lucky-notify]').forEach((node) => node.remove());
+      return;
+    }
     const panel = luckyNotifyPanel();
     if (!panel || !currentNodeSeekUserId()) {
       document.querySelectorAll('[data-nsit-lucky-notify]').forEach((node) => node.remove());
@@ -5666,7 +5830,7 @@ function formValues(app) {
   function renderLuckyAnnounceButton() {
     if (!luckyNotifyTopFrame()) return;
     const existing = document.querySelector('[data-nsit-lucky-announce]');
-    const context = luckyAnnounceContext();
+    const context = featureEnabled('lucky') ? luckyAnnounceContext() : null;
     if (!context) {
       existing?.remove();
       return;
@@ -6359,6 +6523,7 @@ function replyEditor() {
     app.querySelector('.nsit-calc-modal')?.addEventListener('click', (event) => {
       if (event.target === event.currentTarget) closeCalcModal(app);
     });
+    wireFeatureFlagDialog(app);
     app.querySelector('.nsit-catalog-modal').addEventListener('click', (event) => {
       if (event.target === event.currentTarget) closeMachineCatalog(app);
     });
@@ -6371,6 +6536,7 @@ function replyEditor() {
     });
     // 放在所有内部委托处理器之后：先让脚本自己的交互处理完，再截断冒泡到站点编辑器的事件
     if (insidePrivateMessageToolbar) isolateSiteEditorHandlers(app);
+    applyEditorFeatureFlags(app);
   }
 
   injectBaseStyles();
@@ -6410,4 +6576,7 @@ function replyEditor() {
   installTradeStatusActions();
   renderTradeStatusActions();
   syncRepliedComments();
+
+  // 功能开关挂在油猴菜单里：编辑页、帖子页、列表页都能打开同一个设置框
+  if (typeof GM_registerMenuCommand === 'function') GM_registerMenuCommand('功能开关', () => openFeatureFlagDialog(featureFlagHost()));
 })();

@@ -583,6 +583,7 @@
     app.querySelector('.nsit-calc-modal')?.addEventListener('click', (event) => {
       if (event.target === event.currentTarget) closeCalcModal(app);
     });
+    wireFeatureFlagDialog(app);
     app.querySelector('.nsit-catalog-modal').addEventListener('click', (event) => {
       if (event.target === event.currentTarget) closeMachineCatalog(app);
     });
@@ -595,6 +596,7 @@
     });
     // 放在所有内部委托处理器之后：先让脚本自己的交互处理完，再截断冒泡到站点编辑器的事件
     if (insidePrivateMessageToolbar) isolateSiteEditorHandlers(app);
+    applyEditorFeatureFlags(app);
   }
 
   injectBaseStyles();
@@ -634,3 +636,6 @@
   installTradeStatusActions();
   renderTradeStatusActions();
   syncRepliedComments();
+
+  // 功能开关挂在油猴菜单里：编辑页、帖子页、列表页都能打开同一个设置框
+  if (typeof GM_registerMenuCommand === 'function') GM_registerMenuCommand('功能开关', () => openFeatureFlagDialog(featureFlagHost()));
