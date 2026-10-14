@@ -4309,7 +4309,7 @@
   ];
 
   function renderLuckyNotifyEntries() {
-    if (!luckyNotifyTopFrame() || !featureEnabled('lucky')) {
+    if (!luckyNotifyTopFrame() || !featureEnabled('luckyNotify')) {
       document.querySelectorAll('[data-nsit-lucky-notify]').forEach((node) => node.remove());
       return;
     }
@@ -4838,7 +4838,7 @@
   function renderLuckyAnnounceButton() {
     if (!luckyNotifyTopFrame()) return;
     const existing = document.querySelector('[data-nsit-lucky-announce]');
-    const context = featureEnabled('lucky') ? luckyAnnounceContext() : null;
+    const context = featureEnabled('luckyNotify') ? luckyAnnounceContext() : null;
     if (!context) {
       existing?.remove();
       return;

@@ -1,5 +1,5 @@
   const APP_ID = 'nsit-app';
-  const VERSION = '1.4.45';
+  const VERSION = '1.4.46';
   const NODEIMAGE_KEY = 'nsit-nodeimage-api-key';
   const RUNTIME_KEY = '__nodeSeekIssueTemplatesRuntime__';
   const STORAGE_KEY = 'nsit-single-server-draft-v1';
@@ -14,7 +14,8 @@
     ['editorTemplates', '出鸡模板', '发帖 / 回帖编辑器里的「出🐔模板」入口'],
     ['buyTemplate', '收鸡模板', '编辑器里的「收🐔模板」入口'],
     ['calculator', '剩余价值计算', '回帖 / 私信编辑器里的计算器入口'],
-    ['lucky', '抽奖', '编辑器里的「抽奖配置」、抽奖 / 中奖记录与开奖公告'],
+    ['lucky', '抽奖配置', '编辑器里的「抽奖配置」入口'],
+    ['luckyNotify', '抽奖与中奖通知', '个人统计里的「抽奖 / 中奖」入口，以及帖子的开奖公告按钮'],
     ['tradeStatus', '交易状态', '帖子页 #0 楼旁的「已出 / 已收」按钮'],
     ['repliedPosts', '我的回复', '帖子页和列表页的回复楼层标记'],
     ['postFilter', '关键字过滤', '列表页的关键字过滤入口'],
