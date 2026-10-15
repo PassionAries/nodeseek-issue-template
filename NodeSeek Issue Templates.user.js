@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NodeSeek Issue Templates
 // @namespace    https://www.nodeseek.com/
-// @version      1.4.48
+// @version      1.4.49
 // @description  在 NodeSeek 发帖或编辑帖页面用表单生成交易帖，并回填 Markdown 编辑器。
 // @author       vico
 // @updateURL    https://github.com/ruoqianfengshao/nodeseek-issue-template/releases/latest/download/NodeSeek.Issue.Templates.min.user.js
@@ -22,7 +22,7 @@
   'use strict';
 
 const APP_ID = 'nsit-app';
-  const VERSION = '1.4.47';
+  const VERSION = '1.4.48';
   const NODEIMAGE_KEY = 'nsit-nodeimage-api-key';
   const RUNTIME_KEY = '__nodeSeekIssueTemplatesRuntime__';
   const STORAGE_KEY = 'nsit-single-server-draft-v1';
@@ -372,7 +372,8 @@ function escapeHtml(value) {
               <div class="nsit-calc-insert" data-nsit-calc-convert-insert>—</div>
             </section>
           </div>
-          <footer class="nsit-calc-foot"><div class="nsit-calc-foot-cell"><button type="button" class="nsit-primary" data-action="fill-calc-remaining" disabled>回填剩余价值</button></div><div class="nsit-calc-foot-cell"><button type="button" class="nsit-primary" data-action="fill-calc-convert" disabled>回填对照表</button></div><div class="nsit-calc-status" data-nsit-calc-status role="status"></div></footer>
+          <footer class="nsit-calc-foot"><div class="nsit-calc-foot-cell"><label class="nsit-card-toggle"><input type="checkbox" name="calcGenerateCard" checked>回填图片</label><button type="button" class="nsit-primary" data-action="fill-calc-remaining" disabled>回填剩余价值</button></div><div class="nsit-calc-foot-cell"><button type="button" class="nsit-primary" data-action="fill-calc-convert" disabled>回填对照表</button></div><div class="nsit-calc-status" data-nsit-calc-status role="status"></div></footer>
+          <div class="nsit-generation-loading nsit-calc-loading" aria-hidden="true"><div class="nsit-generation-loading-content" role="status" aria-live="polite"><i class="nsit-generation-spinner" aria-hidden="true"></i><span>正在生成，请稍候…</span></div></div>
         </section>
       </div>`;
   }
@@ -764,11 +765,11 @@ function escapeHtml(value) {
 #${APP_ID} .nsit-section{padding:14px 0;border-bottom:1px solid var(--nsit-line)}#${APP_ID} .nsit-section:last-child,#${APP_ID} .nsit-tg-contact{border-bottom:0}#${APP_ID} .nsit-section p{margin:3px 0 10px;font-size:14px}#${APP_ID} .nsit-basic .nsit-grid{grid-template-columns:repeat(10,minmax(0,1fr))}#${APP_ID} .nsit-basic .nsit-field--vendor,#${APP_ID} .nsit-basic .nsit-field--model{grid-column:span 5}#${APP_ID} .nsit-basic .nsit-field--cpu,#${APP_ID} .nsit-basic .nsit-field--memory,#${APP_ID} .nsit-basic .nsit-field--disk,#${APP_ID} .nsit-basic .nsit-field--bandwidth,#${APP_ID} .nsit-basic .nsit-field--traffic{grid-column:span 2}#${APP_ID} .nsit-title-divider{height:1px;margin:16px 0 0;background:var(--nsit-line)}#${APP_ID} .nsit-post-title{margin-top:0}#${APP_ID} .nsit-title-hint{margin-left:6px;color:var(--nsit-muted);font-size:12px;font-weight:400}
         #${APP_ID} .nsit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}#${APP_ID} .nsit-field{display:grid;gap:5px;min-width:0}#${APP_ID} .nsit-field span{font-size:14px;color:var(--nsit-ink-soft)}.nsit-field-wide{grid-column:1/-1}
         #${APP_ID} input,#${APP_ID} select,#${APP_ID} textarea{width:100%;min-width:0;border:1px solid var(--nsit-line-strong);border-radius:7px;background:var(--nsit-surface);color:var(--nsit-ink);padding:8px 9px;font:inherit;outline:none}#${APP_ID} textarea{resize:vertical}#${APP_ID} input:focus,#${APP_ID} select:focus,#${APP_ID} textarea:focus{border-color:var(--nsit-accent);box-shadow:0 0 0 3px var(--nsit-accent-ring)}#${APP_ID} .nsit-picker{position:relative;z-index:0;display:block;isolation:isolate}#${APP_ID} .nsit-picker input{padding-right:35px}#${APP_ID} .nsit-picker-toggle{position:absolute;z-index:1;top:50%;right:8px;display:grid;place-items:center;width:20px;height:20px;margin:0;padding:0;transform:translateY(-50%);border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:var(--nsit-ink-soft-3)}#${APP_ID} .nsit-picker-toggle i{display:block;width:18px;height:18px;background:center/18px 18px no-repeat url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 48 48' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M36 18L24 30L12 18' stroke='%23333' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}#${APP_ID} .nsit-picker-toggle:hover{color:var(--nsit-ink)}#${APP_ID} .nsit-picker-menu{display:none;position:absolute;z-index:20;top:calc(100% + 5px);left:0;width:100%;max-height:180px;overflow:auto;border:1px solid var(--nsit-line-strong);border-radius:8px;background:var(--nsit-surface);box-shadow:0 8px 18px var(--nsit-shadow-soft);padding:5px}#${APP_ID} .nsit-picker.is-open{z-index:30}#${APP_ID} .nsit-picker.is-open .nsit-picker-menu{display:grid;gap:2px}#${APP_ID} .nsit-picker-menu [data-nsit-picker-option]{display:block;width:100%;margin:0;border:0;border-radius:5px;background:transparent;padding:7px 9px;text-align:left;color:var(--nsit-ink-soft-5);font:inherit;cursor:pointer}#${APP_ID} .nsit-picker-menu [data-nsit-picker-option]:hover,#${APP_ID} .nsit-picker-menu [data-nsit-picker-option].is-active{background:var(--nsit-warn-soft);color:var(--nsit-accent-ink-3)}#${APP_ID} .nsit-picker-menu [data-nsit-picker-option][hidden]{display:none}#${APP_ID} .nsit-model-suggest{position:relative;z-index:0;display:block}#${APP_ID} .nsit-model-suggest-menu{display:none;position:absolute;z-index:40;top:calc(100% + 5px);left:0;width:100%;max-height:260px;overflow:auto;border:1px solid var(--nsit-line-strong);border-radius:8px;background:var(--nsit-surface);box-shadow:0 8px 18px var(--nsit-shadow-soft);padding:5px}#${APP_ID} .nsit-model-suggest.is-open{z-index:35}#${APP_ID} .nsit-model-suggest.is-open .nsit-model-suggest-menu{display:grid;gap:2px}#${APP_ID} .nsit-model-suggestion{display:grid;width:100%;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;margin:0;border:0;border-radius:6px;background:transparent;padding:8px 9px;color:var(--nsit-ink-soft-5);font:inherit;text-align:left;cursor:pointer}#${APP_ID} .nsit-model-suggestion:hover{background:var(--nsit-warn-soft);color:var(--nsit-accent-ink-3)}#${APP_ID} .nsit-model-suggestion strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${APP_ID} .nsit-model-suggestion small{color:var(--nsit-muted);font-size:12px;white-space:nowrap}#${APP_ID} .nsit-model-suggestion span{grid-column:1/-1;color:var(--nsit-muted-2);font-size:12px;line-height:1.45}#${APP_ID} .nsit-model-suggest-empty{margin:0;padding:8px 9px;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-asking-price{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px}#${APP_ID} .nsit-asking-price .nsit-field{min-width:0}#${APP_ID} .nsit-price-preview{min-height:37px;border:1px solid var(--nsit-accent-line);border-radius:7px;background:var(--nsit-accent-soft-2);padding:8px 10px;color:var(--nsit-accent-ink-5);font-size:14px;line-height:19px;white-space:nowrap}#${APP_ID} .nsit-report-remarks{display:grid;grid-template-columns:1fr;gap:12px}#${APP_ID} .nsit-report-remarks .nsit-field{min-width:0}#${APP_ID} .nsit-report-remarks .nsit-field-wide{grid-column:auto}#${APP_ID} .nsit-report-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#${APP_ID} .nsit-tag-list{display:flex;flex-wrap:wrap;gap:8px}#${APP_ID} .nsit-tag{position:relative;cursor:pointer}#${APP_ID} .nsit-tag input{position:absolute;opacity:0;pointer-events:none}#${APP_ID} .nsit-tag span{display:block;border:1px solid var(--nsit-line-strong);border-radius:999px;background:var(--nsit-surface);padding:6px 11px;color:var(--nsit-ink-soft);font-size:14px;transition:.15s}#${APP_ID} .nsit-tag--transfer input:checked + span{border-color:var(--nsit-tag-transfer-line);background:var(--nsit-tag-transfer-soft);color:var(--nsit-tag-transfer-ink)}#${APP_ID} .nsit-tag--identity input:checked + span{border-color:var(--nsit-tag-identity-line);background:var(--nsit-tag-identity-soft);color:var(--nsit-tag-identity-ink)}#${APP_ID} .nsit-tag--brokerWalk input:checked + span,#${APP_ID} .nsit-tag--broker input:checked + span{border-color:var(--nsit-tag-broker-line);background:var(--nsit-tag-broker-soft);color:var(--nsit-tag-broker-ink)}#${APP_ID} .nsit-tag--push input:checked + span{border-color:var(--nsit-tag-push-line);background:var(--nsit-tag-push-soft);color:var(--nsit-tag-push-ink)}#${APP_ID} .nsit-tag--payment input:checked + span{border-color:var(--nsit-tag-payment-line);background:var(--nsit-tag-payment-soft);color:var(--nsit-tag-payment-ink)}#${APP_ID} .nsit-tag--extras input:checked + span{border-color:var(--nsit-tag-extras-line);background:var(--nsit-tag-extras-soft);color:var(--nsit-tag-extras-ink)}#${APP_ID} .nsit-tag input:checked + span{box-shadow:inset 0 0 0 1px currentColor;font-weight:650;filter:saturate(1.25)}#${APP_ID} .nsit-tag:hover span{transform:translateY(-1px)}
-        #${APP_ID} .nsit-value-card{margin:14px 0;border:1px solid var(--nsit-accent-line-2);border-radius:12px;background:linear-gradient(145deg,var(--nsit-surface),var(--nsit-accent-soft-2));padding:14px}#${APP_ID} .nsit-value-inputs{display:grid;gap:8px;margin-bottom:8px}#${APP_ID} .nsit-value-row-one,#${APP_ID} .nsit-value-row-two{grid-template-columns:repeat(3,minmax(0,1fr))}#${APP_ID} .nsit-value-row-two{padding-bottom:8px;border-bottom:1px solid var(--nsit-line)}#${APP_ID} .nsit-value-inputs .nsit-field{gap:3px}#${APP_ID} .nsit-value-inputs .nsit-field span{font-size:14px;color:var(--nsit-ink-soft)}#${APP_ID} .nsit-value-inputs .nsit-field--askingPrice > span{color:var(--nsit-ok)}#${APP_ID} .nsit-value-inputs .nsit-field--askingPremium > span{color:var(--nsit-danger)}#${APP_ID} .nsit-value-inputs input,#${APP_ID} .nsit-value-inputs select{padding:6px 7px;font-size:14px}#${APP_ID} .nsit-amount-input{display:flex;min-width:0}#${APP_ID} .nsit-amount-input .nsit-currency-picker{width:112px;flex:none}#${APP_ID} .nsit-amount-input .nsit-currency-picker input{margin:0;border-radius:7px 0 0 7px;cursor:pointer}#${APP_ID} .nsit-currency-picker .nsit-picker-menu{width:max-content;min-width:100%}#${APP_ID} .nsit-currency-picker .nsit-picker-menu [data-nsit-picker-option]{white-space:nowrap}#${APP_ID} .nsit-amount-input > input{margin-left:-1px;border-radius:0 7px 7px 0}#${APP_ID} .nsit-value-inputs .nsit-picker input{padding-right:30px}#${APP_ID} .nsit-value-inputs .nsit-picker-toggle{right:5px;width:18px;height:18px}#${APP_ID} .nsit-value-inputs .nsit-picker-toggle i{width:15px;height:15px;background-size:15px 15px}#${APP_ID} .nsit-rate-value{display:flex;align-items:center;min-width:0;gap:4px;white-space:nowrap}#${APP_ID} .nsit-value-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;color:var(--nsit-warn-ink);font-weight:600}#${APP_ID} .nsit-value-heading>.nsit-rate-value{margin-right:auto;color:var(--nsit-ok-ink);font-weight:400}#${APP_ID} .nsit-value-heading>.nsit-rate-value strong{min-width:0;overflow:hidden;color:inherit;font-size:14px;font-weight:650;text-overflow:ellipsis}#${APP_ID} .nsit-value-heading>.nsit-rate-value button{width:auto;height:auto;margin:0;padding:0;border:0;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer}#${APP_ID} .nsit-value-stats{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0;white-space:nowrap}#${APP_ID} .nsit-value-heading strong{color:var(--nsit-accent-ink-5);font-size:14px}#${APP_ID} .nsit-title-progress{display:block;width:62px;height:6px;overflow:hidden;border-radius:999px;background:var(--nsit-progress-track)}.nsit-title-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nsit-progress-from),var(--nsit-progress-to));transition:width .15s ease}#${APP_ID} .nsit-value-result{display:flex;align-items:flex-start;gap:12px;min-height:54px;margin-top:12px}#${APP_ID} .nsit-value{flex:none;margin:0;color:var(--nsit-accent);font-size:34px;font-weight:750;letter-spacing:-1px;line-height:1;word-break:break-all}#${APP_ID} .nsit-value small{margin-right:4px;font-size:15px;font-weight:inherit}#${APP_ID} .nsit-value-result .nsit-price-preview{display:flex;flex:1;align-items:flex-end;justify-content:flex-end;gap:8px;align-self:flex-start;min-width:0;padding:0;border:0;background:transparent;color:var(--nsit-muted);font-size:18px;font-weight:650;line-height:1.3;text-align:right;white-space:normal}#${APP_ID} .nsit-price-preview span{min-width:0}#${APP_ID} .nsit-price-preview b{display:inline-block;flex:none;font-size:34px;letter-spacing:-1px;line-height:1;white-space:nowrap}#${APP_ID} .nsit-price-preview[data-price-state="fair"]{color:var(--nsit-ok)}#${APP_ID} .nsit-price-preview[data-price-state="premium"]{color:var(--nsit-danger)}
+        #${APP_ID} .nsit-value-card{margin:14px 0;border:1px solid var(--nsit-accent-line-2);border-radius:12px;background:linear-gradient(145deg,var(--nsit-surface),var(--nsit-accent-soft-2));padding:14px}#${APP_ID} .nsit-value-inputs{display:grid;gap:8px;margin-bottom:8px}#${APP_ID} .nsit-value-row-one,#${APP_ID} .nsit-value-row-two{grid-template-columns:repeat(3,minmax(0,1fr))}#${APP_ID} .nsit-value-row-two{padding-bottom:8px;border-bottom:1px solid var(--nsit-line)}#${APP_ID} .nsit-value-inputs .nsit-field{gap:3px}#${APP_ID} .nsit-value-inputs .nsit-field span{font-size:14px;color:var(--nsit-ink-soft)}#${APP_ID} .nsit-value-inputs .nsit-field--askingPrice > span{color:var(--nsit-ok)}#${APP_ID} .nsit-value-inputs .nsit-field--askingPremium > span{color:var(--nsit-danger)}#${APP_ID} .nsit-value-inputs input,#${APP_ID} .nsit-value-inputs select{padding:6px 7px;font-size:14px}#${APP_ID} .nsit-amount-input{display:flex;min-width:0}#${APP_ID} .nsit-amount-input .nsit-currency-picker{width:112px;flex:none}#${APP_ID} .nsit-amount-input .nsit-currency-picker input{margin:0;border-radius:7px 0 0 7px;cursor:pointer}#${APP_ID} .nsit-currency-picker .nsit-picker-menu{width:max-content;min-width:100%}#${APP_ID} .nsit-currency-picker .nsit-picker-menu [data-nsit-picker-option]{white-space:nowrap}#${APP_ID} .nsit-amount-input > input{margin-left:-1px;border-radius:0 7px 7px 0}#${APP_ID} .nsit-value-inputs .nsit-picker input{padding-right:30px}#${APP_ID} .nsit-value-inputs .nsit-picker-toggle{right:5px;width:18px;height:18px}#${APP_ID} .nsit-value-inputs .nsit-picker-toggle i{width:15px;height:15px;background-size:15px 15px}#${APP_ID} .nsit-rate-value{display:flex;align-items:center;min-width:0;gap:4px;white-space:nowrap}#${APP_ID} .nsit-value-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;color:var(--nsit-warn-ink);font-weight:600}#${APP_ID} .nsit-value-heading>.nsit-rate-value{margin-right:auto;color:var(--nsit-ok-ink);font-weight:400}#${APP_ID} .nsit-value-heading>.nsit-rate-value strong{min-width:0;overflow:hidden;color:inherit;font-size:14px;font-weight:650;text-overflow:ellipsis}#${APP_ID} .nsit-value-heading>.nsit-rate-value button{width:auto;height:auto;margin:0;padding:0;border:0;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer}#${APP_ID} .nsit-value-stats{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0;white-space:nowrap}#${APP_ID} .nsit-value-heading strong{color:var(--nsit-accent-ink-5);font-size:14px}#${APP_ID} .nsit-title-progress{display:block;width:62px;height:6px;overflow:hidden;border-radius:999px;background:var(--nsit-progress-track)}.nsit-title-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nsit-progress-from),var(--nsit-progress-to));transition:width .15s ease}#${APP_ID} .nsit-value-result{display:flex;align-items:flex-start;gap:12px;min-height:54px;margin-top:12px}#${APP_ID} .nsit-value{flex:none;margin:0;color:var(--nsit-accent);font-size:34px;font-weight:750;letter-spacing:-1px;line-height:1;word-break:break-all}#${APP_ID} .nsit-value small{margin-right:4px;font-size:15px;font-weight:inherit}#${APP_ID} .nsit-value-result .nsit-price-preview{display:flex;flex:1;align-items:center;justify-content:flex-end;gap:8px;align-self:flex-start;min-width:0;padding:0;border:0;background:transparent;color:var(--nsit-muted);font-size:18px;font-weight:650;line-height:1.3;text-align:right;white-space:normal}#${APP_ID} .nsit-price-preview span{min-width:0}#${APP_ID} .nsit-price-preview b{display:inline-block;flex:none;font-size:34px;letter-spacing:-1px;line-height:1;white-space:nowrap}#${APP_ID} .nsit-price-preview[data-price-state="fair"]{color:var(--nsit-ok)}#${APP_ID} .nsit-price-preview[data-price-state="premium"]{color:var(--nsit-danger)}
         #${APP_ID} .nsit-formula{margin:0;font-size:14px;color:var(--nsit-muted)}#${APP_ID} .nsit-action-dock{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 18px;border-top:1px solid var(--nsit-line);background:var(--nsit-surface);box-shadow:0 -8px 18px var(--nsit-shadow-soft-6)}#${APP_ID} .nsit-toggle-group,#${APP_ID} .nsit-actions{display:flex;flex-wrap:wrap;gap:8px}#${APP_ID} .nsit-actions{justify-content:flex-end}#${APP_ID} .nsit-card-toggle{display:flex;align-items:center;gap:6px;color:var(--nsit-ink-soft);cursor:pointer;white-space:nowrap}#${APP_ID} .nsit-card-toggle input{width:15px;height:15px;margin:0;accent-color:var(--nsit-accent)}#${APP_ID} .nsit-config-check-toggle{position:relative;gap:4px}#${APP_ID} .nsit-config-check-help{display:grid;place-items:center;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;font-size:10px;font-weight:700;line-height:1}#${APP_ID} .nsit-config-check-tooltip{position:absolute;z-index:10;bottom:calc(100% + 8px);left:0;width:310px;padding:9px 11px;border-radius:7px;background:var(--nsit-pill-bg-2);color:var(--nsit-pill-ink);font-size:12px;font-weight:400;line-height:1.55;white-space:normal;box-shadow:0 8px 18px var(--nsit-shadow-soft-3);opacity:0;pointer-events:none;transform:translateY(3px);transition:opacity .15s,transform .15s}#${APP_ID} .nsit-config-check-tooltip::after{position:absolute;top:100%;left:22px;border:5px solid transparent;border-top-color:var(--nsit-pill-bg-2);content:""}#${APP_ID} .nsit-config-check-toggle:hover .nsit-config-check-tooltip{opacity:1;transform:translateY(0)}#${APP_ID} button{border:1px solid var(--nsit-line-strong);border-radius:7px;background:var(--nsit-surface);color:var(--nsit-ink-soft-2);padding:8px 11px;font:inherit;cursor:pointer}#${APP_ID} button:hover{border-color:var(--nsit-accent);color:var(--nsit-accent-ink-2)}#${APP_ID} button.nsit-primary{background:var(--nsit-accent);border-color:var(--nsit-accent);color:var(--nsit-on-accent)}#${APP_ID} .nsit-status{position:absolute;right:18px;bottom:100%;max-width:calc(100% - 36px);margin:0 0 7px;padding:4px 7px;border-radius:5px;background:var(--nsit-pill-bg);color:var(--nsit-pill-ink);font-size:14px;opacity:0;pointer-events:none;transition:opacity .15s}.nsit-status:not(:empty){opacity:1}
         #${APP_ID} .nsit-trigger{display:inline;margin:0 7px 0 0;padding:3px 8px;border:1px solid var(--nsit-accent);border-radius:5px;background:var(--nsit-accent-soft);color:var(--nsit-accent-ink);font:600 13px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;vertical-align:baseline}#${APP_ID} .nsit-trigger:hover{border-color:var(--nsit-accent-hover);background:var(--nsit-accent);color:var(--nsit-on-accent)}#${APP_ID} .nsit-buy-trigger{border-color:var(--nsit-info-line-3);background:var(--nsit-info-soft);color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-trigger:hover{border-color:var(--nsit-info-ink);background:var(--nsit-info)}#${APP_ID} .nsit-modal,#${APP_ID} .nsit-buy-modal{display:none;position:fixed;z-index:2147483647;inset:0;overflow:auto;padding:28px 16px;background:var(--nsit-scrim)}#${APP_ID}.nsit-open .nsit-modal,#${APP_ID}.nsit-buy-open .nsit-buy-modal{display:grid;place-items:center}#${APP_ID} .nsit-dialog-wrap{position:relative;width:min(980px,100%);max-height:calc(100vh - 56px);margin:auto}#${APP_ID} .nsit-modal .nsit-shell,#${APP_ID} .nsit-buy-shell{position:relative;display:flex;flex-direction:column;width:min(680px,100%);max-height:calc(100vh - 56px);margin:0;border:1px solid var(--nsit-line);border-radius:12px;background:var(--nsit-surface);box-shadow:0 20px 60px var(--nsit-shadow-2);overflow:hidden}#${APP_ID} .nsit-modal .nsit-shell{width:100%}#${APP_ID} .nsit-close{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:transparent;font-size:25px;line-height:1;color:var(--nsit-dim)}#${APP_ID} .nsit-close:hover{background:var(--nsit-hover-bg);color:var(--nsit-ink)}#${APP_ID} .nsit-head>div{min-width:0}#${APP_ID} .nsit-head>div:last-child{display:flex;align-items:center;gap:8px;white-space:nowrap}#${APP_ID} .nsit-personalization-trigger{display:inline-flex;align-items:center;height:28px;gap:5px;margin:0;padding:0 4px;border:0;background:transparent;color:var(--nsit-accent);font:inherit;font-weight:600;line-height:1}#${APP_ID} .nsit-personalization-trigger:hover{border-color:transparent;background:var(--nsit-warn-soft);color:var(--nsit-accent-ink-4)}#${APP_ID} .nsit-personalization-trigger svg{width:18px;height:18px;fill:currentColor}#${APP_ID} .nsit-head-divider{width:1px;height:18px;background:var(--nsit-line-strong)}#${APP_ID} .nsit-buy-shell{width:min(940px,100%);height:min(640px,calc(100vh - 56px))}#${APP_ID} .nsit-buy-body{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:0;flex:1}#${APP_ID} .nsit-buy-catalog{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--nsit-line);background:var(--nsit-sunken)}#${APP_ID} .nsit-buy-catalog>header{padding:10px 14px 6px}#${APP_ID} .nsit-buy-catalog h3{font-size:15px}#${APP_ID} .nsit-buy-catalog>label{padding:0 14px 8px}#${APP_ID} .nsit-buy-catalog>label input{padding:7px 8px}#${APP_ID} [data-nsit-buy-catalog-results]{display:grid;align-content:start;gap:7px;min-height:0;overflow:auto;padding:0 10px 12px}#${APP_ID} .nsit-buy-catalog-result{display:grid;gap:3px;width:100%;padding:9px 10px;text-align:left}#${APP_ID} .nsit-buy-catalog-result strong{color:var(--nsit-ink)}#${APP_ID} .nsit-buy-catalog-result span,#${APP_ID} .nsit-buy-catalog-result small{color:var(--nsit-muted-2);font-size:12px;line-height:1.4}#${APP_ID} .nsit-buy-catalog-result:hover{border-color:var(--nsit-info-line-3);background:var(--nsit-info-soft)}#${APP_ID} .nsit-buy-form{overflow:auto;padding:0 18px 12px}#${APP_ID} .nsit-buy-form .nsit-section{padding:10px 0}#${APP_ID} .nsit-buy-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}#${APP_ID} .nsit-buy-spec-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 10px;margin-top:8px}#${APP_ID} .nsit-buy-price{display:grid;gap:6px}#${APP_ID} .nsit-buy-price-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px}#${APP_ID} .nsit-buy-price-option{display:grid;grid-template-columns:auto auto minmax(64px,78px) auto;align-items:center;gap:5px;padding:4px 2px;color:var(--nsit-ink-soft);cursor:pointer}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked){color:var(--nsit-info-ink)}#${APP_ID} .nsit-buy-price-option input[type="radio"]{width:15px;height:15px;margin:0;accent-color:var(--nsit-info)}#${APP_ID} .nsit-buy-price-option input[type="number"]{width:100%;min-width:0;padding:4px 5px;font-size:13px}#${APP_ID} .nsit-buy-price-option:has(input[type="radio"]:checked) input[type="number"]{border-color:var(--nsit-info);color:var(--nsit-info-ink);box-shadow:0 0 0 2px var(--nsit-info-ring-2)}#${APP_ID} .nsit-buy-price-option em{font-style:normal;white-space:nowrap}#${APP_ID} .nsit-buy-tags{padding-top:1px}#${APP_ID} .nsit-buy-shell .nsit-action-dock{justify-content:space-between;gap:12px;padding:10px 18px}#${APP_ID} [data-nsit-buy-status]{margin-left:auto;text-align:right}@media(max-width:760px){#${APP_ID} .nsit-buy-shell{height:auto;max-height:calc(100vh - 16px)}#${APP_ID} .nsit-buy-body{grid-template-columns:1fr;overflow:auto}#${APP_ID} .nsit-buy-catalog{max-height:245px;border-right:0;border-bottom:1px solid var(--nsit-line)}#${APP_ID} .nsit-buy-form{overflow:visible}#${APP_ID} .nsit-buy-spec-grid{grid-template-columns:repeat(3,minmax(0,1fr))}#${APP_ID} .nsit-buy-price-options{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){#${APP_ID} .nsit-buy-grid,#${APP_ID} .nsit-buy-price-options,#${APP_ID} .nsit-buy-spec-grid{grid-template-columns:1fr}#${APP_ID} .nsit-buy-modal{padding:8px}}
         #${APP_ID} .nsit-catalog-modal{display:none;position:fixed;z-index:2147483647;inset:0;padding:20px;background:var(--nsit-scrim)}#${APP_ID}.nsit-catalog-open .nsit-catalog-modal{display:grid;place-items:center}#${APP_ID} .nsit-catalog-dialog{width:min(720px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid var(--nsit-line);border-radius:12px;background:var(--nsit-surface);box-shadow:0 20px 60px var(--nsit-shadow-2)}#${APP_ID} .nsit-catalog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--nsit-line)}#${APP_ID} .nsit-catalog-head h3{font-size:16px}#${APP_ID} .nsit-catalog-head-copy{display:flex;align-items:baseline;gap:8px;min-width:0}#${APP_ID} .nsit-catalog-head-copy small{color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-catalog-search{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;padding:14px 16px;border-bottom:1px solid var(--nsit-line)}#${APP_ID} .nsit-catalog-search button{white-space:nowrap}#${APP_ID} .nsit-catalog-results{display:grid;gap:8px;min-height:88px;padding:14px 16px}#${APP_ID} .nsit-catalog-empty{margin:auto;color:var(--nsit-muted);font-size:14px}#${APP_ID} .nsit-catalog-result{display:grid;width:100%;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:11px 12px;text-align:left}#${APP_ID} .nsit-catalog-result strong{color:var(--nsit-ink)}#${APP_ID} .nsit-catalog-result span{color:var(--nsit-ink-soft);font-size:13px;line-height:1.55}#${APP_ID} .nsit-catalog-result small{align-self:end;color:var(--nsit-faint);font-size:12px;white-space:nowrap}#${APP_ID} .nsit-report-remarks{grid-template-columns:1fr}@media(max-width:820px){#${APP_ID} .nsit-body{display:block}#${APP_ID} .nsit-side{border-left:0;border-top:1px solid var(--nsit-line)}#${APP_ID} .nsit-value-card{position:static}}@media(max-width:520px){#${APP_ID} .nsit-grid,#${APP_ID} .nsit-basic .nsit-grid,#${APP_ID} .nsit-report-remarks,#${APP_ID} .nsit-asking-price,#${APP_ID} .nsit-catalog-search{grid-template-columns:1fr}#${APP_ID} .nsit-value-row-one,#${APP_ID} .nsit-value-row-two{grid-template-columns:repeat(3,minmax(0,1fr))}#${APP_ID} .nsit-basic .nsit-field--vendor,#${APP_ID} .nsit-basic .nsit-field--model,#${APP_ID} .nsit-basic .nsit-field--cpu,#${APP_ID} .nsit-basic .nsit-field--memory,#${APP_ID} .nsit-basic .nsit-field--disk,#${APP_ID} .nsit-basic .nsit-field--bandwidth,#${APP_ID} .nsit-basic .nsit-field--traffic,#${APP_ID} .nsit-basic .nsit-field--remainingTraffic{grid-column:auto}#${APP_ID} .nsit-modal{padding:8px}.nsit-star-note{display:none}#${APP_ID} .nsit-catalog-head-copy{align-items:flex-start;flex-direction:column;gap:2px}}
-        #${APP_ID} .nsit-value-inputs .nsit-field--renewalAmount > span:first-child{display:flex;align-items:center;justify-content:space-between;gap:4px}#${APP_ID} .nsit-value-inputs .nsit-field--renewalAmount [data-nsit-amount-cny]{color:var(--nsit-ok-ink);font-size:12px;font-weight:650;white-space:nowrap}#${APP_ID} .nsit-field-icon{display:inline-flex;vertical-align:-3px;margin-right:4px;color:inherit}#${APP_ID} .nsit-field-icon svg,#${APP_ID} .nsit-value-heading-icon{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}#${APP_ID} .nsit-field--askingPrice .nsit-field-icon,#${APP_ID} .nsit-field--askingPrice .nsit-field-icon svg{color:var(--nsit-ok)}#${APP_ID} .nsit-field--askingPremium .nsit-field-icon,#${APP_ID} .nsit-field--askingPremium .nsit-field-icon svg{color:var(--nsit-danger)}#${APP_ID} .nsit-value-heading-icon{display:inline-block;margin-right:4px;vertical-align:-3px}#${APP_ID} .nsit-contact-post-remarks{display:grid;gap:10px}#${APP_ID} .nsit-value-result{align-items:flex-end}#${APP_ID} .nsit-value-result .nsit-price-preview{align-self:flex-end}#${APP_ID} .nsit-price-typing{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;animation:nsit-type-in .24s steps(12,end)}@keyframes nsit-type-in{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}@keyframes nsit-progress-slide{from{width:0;opacity:0;transform:translateX(-8px)}to{width:62px;opacity:1;transform:translateX(0)}}#${APP_ID} .nsit-title-progress.is-visible{animation:nsit-progress-slide .32s ease-out}#${APP_ID} .nsit-vendor-picker input{padding-left:34px}#${APP_ID} .nsit-vendor-input-icon{position:absolute;z-index:2;top:50%;left:9px;transform:translateY(-50%)}#${APP_ID} .nsit-vendor-icon{position:relative;display:grid;place-items:center;flex:none;width:18px;height:18px;border-radius:4px;background:var(--nsit-chip);color:var(--nsit-ink-soft-3);font-size:11px;font-style:normal;overflow:hidden}#${APP_ID} .nsit-vendor-icon img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}#${APP_ID} .nsit-vendor-icon b{font:700 11px/1 sans-serif}#${APP_ID} .nsit-picker-menu [data-nsit-picker-option]{display:flex;align-items:center;gap:7px}
+        #${APP_ID} .nsit-value-inputs .nsit-field--renewalAmount > span:first-child{display:flex;align-items:center;justify-content:space-between;gap:4px}#${APP_ID} .nsit-value-inputs .nsit-field--renewalAmount [data-nsit-amount-cny]{color:var(--nsit-ok-ink);font-size:12px;font-weight:650;white-space:nowrap}#${APP_ID} .nsit-field-icon{display:inline-flex;vertical-align:-3px;margin-right:4px;color:inherit}#${APP_ID} .nsit-field-icon svg,#${APP_ID} .nsit-value-heading-icon{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}#${APP_ID} .nsit-field--askingPrice .nsit-field-icon,#${APP_ID} .nsit-field--askingPrice .nsit-field-icon svg{color:var(--nsit-ok)}#${APP_ID} .nsit-field--askingPremium .nsit-field-icon,#${APP_ID} .nsit-field--askingPremium .nsit-field-icon svg{color:var(--nsit-danger)}#${APP_ID} .nsit-value-heading-icon{display:inline-block;margin-right:4px;vertical-align:-3px}#${APP_ID} .nsit-contact-post-remarks{display:grid;gap:10px}#${APP_ID} .nsit-value-result{align-items:center}#${APP_ID} .nsit-value-result .nsit-price-preview{align-self:center}#${APP_ID} .nsit-price-typing{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;animation:nsit-type-in .24s steps(12,end)}@keyframes nsit-type-in{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}@keyframes nsit-progress-slide{from{width:0;opacity:0;transform:translateX(-8px)}to{width:62px;opacity:1;transform:translateX(0)}}#${APP_ID} .nsit-title-progress.is-visible{animation:nsit-progress-slide .32s ease-out}#${APP_ID} .nsit-vendor-picker input{padding-left:34px}#${APP_ID} .nsit-vendor-input-icon{position:absolute;z-index:2;top:50%;left:9px;transform:translateY(-50%)}#${APP_ID} .nsit-vendor-icon{position:relative;display:grid;place-items:center;flex:none;width:18px;height:18px;border-radius:4px;background:var(--nsit-chip);color:var(--nsit-ink-soft-3);font-size:11px;font-style:normal;overflow:hidden}#${APP_ID} .nsit-vendor-icon img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}#${APP_ID} .nsit-vendor-icon b{font:700 11px/1 sans-serif}#${APP_ID} .nsit-picker-menu [data-nsit-picker-option]{display:flex;align-items:center;gap:7px}
       `;
     const modelSuggestionStyles = `
       #${APP_ID} .nsit-traffic-field{position:relative}#${APP_ID} .nsit-traffic-label{display:flex;align-items:center;justify-content:space-between;gap:6px}#${APP_ID} .nsit-traffic-label-actions{display:flex;align-items:center;gap:4px}#${APP_ID} .nsit-traffic-remaining-trigger{margin:0;padding:0;border:0;background:transparent;color:var(--nsit-ok);font-size:13px;font-weight:650;cursor:pointer;white-space:nowrap}#${APP_ID} .nsit-traffic-remaining-trigger:hover{color:var(--nsit-accent)}#${APP_ID} .nsit-traffic-remaining-trigger:disabled{color:var(--nsit-faint);cursor:not-allowed}#${APP_ID} .nsit-traffic-usage-popover{position:absolute;z-index:50;top:29px;right:0;display:grid;width:250px;gap:9px;border:1px solid var(--nsit-line-strong);border-radius:9px;background:var(--nsit-surface);padding:11px;box-shadow:0 10px 24px var(--nsit-shadow-soft-3);color:var(--nsit-ink-soft)}#${APP_ID} .nsit-traffic-usage-popover label{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px;white-space:nowrap;font-size:14px}#${APP_ID} .nsit-traffic-usage-popover label input{min-width:0;padding:5px 7px}#${APP_ID} .nsit-traffic-usage-popover label em{font-style:normal;white-space:nowrap}#${APP_ID} .nsit-traffic-slider-row{display:flex;align-items:center;gap:8px}#${APP_ID} .nsit-traffic-slider-row small{color:var(--nsit-muted);font-size:14px;text-align:right;white-space:nowrap}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]{flex:1;min-width:0;height:6px;margin:4px 0;padding:0;border:0;background:linear-gradient(90deg,var(--nsit-chip-active-soft) 0 var(--nsit-traffic-used-percent,0%),var(--nsit-line) var(--nsit-traffic-used-percent,0%) 100%);accent-color:var(--nsit-chip-active-soft);appearance:none;-webkit-appearance:none}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]:focus{border:0;box-shadow:none;outline:none}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]::-webkit-slider-runnable-track{height:6px;border:0;border-radius:999px;background:transparent}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]::-webkit-slider-thumb{width:16px;height:16px;margin-top:-5px;border:2px solid var(--nsit-chip-active-soft);border-radius:50%;background:var(--nsit-surface);box-shadow:0 1px 3px var(--nsit-accent-ring-3);-webkit-appearance:none}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]::-moz-range-track{height:6px;border:0;border-radius:999px;background:var(--nsit-line)}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]::-moz-range-progress{height:6px;border:0;border-radius:999px;background:var(--nsit-chip-active-soft)}#${APP_ID} .nsit-traffic-usage-popover input[type="range"]::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--nsit-chip-active-soft);border-radius:50%;background:var(--nsit-surface);box-shadow:0 1px 3px var(--nsit-accent-ring-3)}#${APP_ID} .nsit-traffic-usage-presets{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}#${APP_ID} .nsit-traffic-usage-presets button{margin:0;padding:3px 0;border-radius:4px;color:var(--nsit-muted-2);font-size:12px}#${APP_ID} .nsit-traffic-usage-presets button:hover{border-color:var(--nsit-accent);background:var(--nsit-accent-soft);color:var(--nsit-accent-ink-2)}
@@ -809,7 +810,7 @@ function escapeHtml(value) {
     injectStyles(`#${APP_ID} .nsit-trigger.nsit-calc-trigger{border-color:var(--nsit-ok-line);background:var(--nsit-ok-soft);color:var(--nsit-ok-ink)}#${APP_ID} .nsit-trigger.nsit-calc-trigger:hover{border-color:var(--nsit-ok);background:var(--nsit-ok);color:var(--nsit-on-accent)}#${APP_ID} .nsit-calc-modal{display:none;position:fixed;z-index:2147483647;inset:0;overflow:auto;padding:28px 16px;background:var(--nsit-scrim)}#${APP_ID}.nsit-calc-open .nsit-calc-modal{display:grid;place-items:center}#${APP_ID} .nsit-calc-dialog{display:flex;flex-direction:column;width:min(1180px,100%);max-height:calc(100vh - 56px);border:1px solid var(--nsit-line);border-radius:12px;background:var(--nsit-surface);box-shadow:0 20px 60px var(--nsit-shadow-2);overflow:hidden}#${APP_ID} .nsit-calc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 18px;border-bottom:1px solid var(--nsit-line);background:linear-gradient(110deg,var(--nsit-head-from),var(--nsit-accent-soft))}#${APP_ID} .nsit-calc-head-copy{display:flex;align-items:baseline;gap:9px;min-width:0}#${APP_ID} .nsit-calc-head-copy h3{font-size:16px}#${APP_ID} .nsit-calc-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-height:0;overflow:auto}#${APP_ID} .nsit-calc-panel{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px 18px}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-panel h4{margin:0;color:var(--nsit-ink);font-size:15px}#${APP_ID} .nsit-calc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px}#${APP_ID} .nsit-calc-panel-head button{width:auto;height:auto;margin:0;padding:0;border:0;background:transparent;color:var(--nsit-ok-ink);font-size:16px;line-height:1;cursor:pointer}#${APP_ID} .nsit-calc-hint{margin:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-value-card{margin:0}#${APP_ID} .nsit-calc-value-card .nsit-value-row-two{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr)}#${APP_ID} .nsit-calc-value-card .nsit-value-heading{flex-wrap:wrap;gap:6px 10px}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>span:first-child{white-space:nowrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:3;width:100%;margin-right:0}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>.nsit-rate-value strong{font-size:12px}#${APP_ID} .nsit-calc-value-card .nsit-value-stats strong{font-size:13px}#${APP_ID} .nsit-calc-value-card .nsit-value{font-size:30px}#${APP_ID} .nsit-calc-value-card .nsit-value-result .nsit-price-preview{font-size:15px}#${APP_ID} .nsit-calc-value-card .nsit-price-preview b{font-size:24px}#${APP_ID} .nsit-calc-progress{display:block;flex:none;width:62px;height:6px;overflow:hidden;border-radius:999px;background:var(--nsit-progress-track)}#${APP_ID} .nsit-calc-progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nsit-progress-from),var(--nsit-progress-to));transition:width .15s ease}#${APP_ID} .nsit-calc-rates{display:grid;gap:10px}#${APP_ID} .nsit-calc-rate-row{display:grid;grid-template-columns:24px 132px 166px minmax(0,1fr);align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--nsit-raised)}#${APP_ID} .nsit-calc-rate-row .nsit-picker input{padding:6px 26px 6px 8px;font-size:13px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle{right:5px;width:16px;height:16px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle i{width:14px;height:14px;background-size:14px 14px}#${APP_ID} .nsit-calc-rate-row .nsit-calc-rate-amount{padding:6px 8px;text-align:right;font-size:15px;font-weight:650}#${APP_ID} .nsit-calc-rate-remove{display:grid;place-items:center;width:24px;height:24px;margin:0;padding:0;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--nsit-muted);cursor:pointer}#${APP_ID} .nsit-calc-rate-remove:hover{color:var(--nsit-danger)}#${APP_ID} .nsit-calc-rate-remove svg{width:20px;height:20px;fill:currentColor}#${APP_ID} .nsit-calc-rate-gap{display:block}#${APP_ID} .nsit-calc-rate-line{min-width:0;overflow:hidden;color:var(--nsit-muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap}#${APP_ID} .nsit-calc-add{border-style:dashed;color:var(--nsit-ok-ink)}#${APP_ID} .nsit-calc-insert{padding:8px 10px;border:1px dashed var(--nsit-line-strong);border-radius:8px;background:var(--nsit-sunken);color:var(--nsit-muted-2);font-size:13px;line-height:1.5;word-break:break-all}#${APP_ID} .nsit-calc-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-top:1px solid var(--nsit-line);background:var(--nsit-surface);box-shadow:0 -8px 18px var(--nsit-shadow-soft-6)}#${APP_ID} .nsit-calc-foot-cell{display:flex;justify-content:flex-end;padding:12px 18px}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-status{grid-column:1/-1;padding:0 18px;color:var(--nsit-muted);font-size:13px;text-align:right}#${APP_ID} .nsit-calc-status:empty{display:none}#${APP_ID} .nsit-calc-status:not(:empty){padding-bottom:12px}@media(max-width:1080px){#${APP_ID} .nsit-calc-body{grid-template-columns:1fr}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-top:1px solid var(--nsit-line);border-left:0}#${APP_ID} .nsit-calc-foot{grid-template-columns:1fr}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-top:1px solid var(--nsit-line);border-left:0}}`);
     // 剩余价值的回填预览是多行文本，保留换行。
     // 实时汇率挪到「剩余价值」标题旁（压过上面对应的「独占一行」规则），并补上回本那一行。
-    injectStyles(`#${APP_ID} .nsit-calc-insert{white-space:pre-wrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:0;width:auto;margin-right:auto}#${APP_ID} .nsit-calc-value-card .nsit-value small{font-size:20px}#${APP_ID} .nsit-calc-value-card .nsit-value-result{margin-top:6px;padding-bottom:10px}#${APP_ID} .nsit-calc-modal input:disabled{background:var(--nsit-sunken);color:var(--nsit-faint);cursor:not-allowed}#${APP_ID} .nsit-calc-payback-fields{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);padding-top:10px;border-top:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-payback-result{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;margin-top:8px}#${APP_ID} .nsit-calc-payback-result b{flex:none;color:var(--nsit-accent);font-size:18px;font-weight:750;line-height:1.2}#${APP_ID} .nsit-calc-payback-result[data-state="done"] b{color:var(--nsit-ok)}#${APP_ID} .nsit-calc-payback-result small{min-width:0;color:var(--nsit-muted);font-size:12px}`);
+    injectStyles(`#${APP_ID} .nsit-calc-insert{white-space:pre-wrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:0;width:auto;margin-right:auto}#${APP_ID} .nsit-calc-value-card .nsit-value small{font-size:20px}#${APP_ID} .nsit-calc-value-card .nsit-value-result{margin-top:6px;padding-bottom:10px}#${APP_ID} .nsit-calc-modal input:disabled{background:var(--nsit-sunken);color:var(--nsit-faint);cursor:not-allowed}#${APP_ID} .nsit-calc-payback-fields{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);padding-top:10px;border-top:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-payback-result{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;margin-top:8px}#${APP_ID} .nsit-calc-payback-result b{flex:none;color:var(--nsit-accent);font-size:18px;font-weight:750;line-height:1.2}#${APP_ID} .nsit-calc-payback-result[data-state="done"] b{color:var(--nsit-ok)}#${APP_ID} .nsit-calc-payback-result small{min-width:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-foot-cell{gap:10px}#${APP_ID} .nsit-calc-foot-cell .nsit-card-toggle{font-size:13px}#${APP_ID} .nsit-calc-dialog{position:relative}#${APP_ID}.nsit-calc-generating .nsit-calc-loading{display:grid}`);
     app.innerHTML = `
       <button type="button" class="nsit-trigger" aria-haspopup="dialog">出🐔模板</button>
       ${replyMode ? '<button type="button" class="nsit-trigger nsit-calc-trigger" aria-haspopup="dialog">剩余价值计算</button>' : ''}
@@ -1813,13 +1814,62 @@ function formValues(app) {
     return `- 回本周期：${paybackDurationText(days)}（${base.label} ¥${base.amount.toFixed(2)} ÷ ${costText}）`;
   }
 
+  // 卡片最底下那行回本周期：结果 + 算式，算不出来就整行不画。
+  function paybackCardState(state) {
+    const days = paybackDays(state, paybackPerDay(state));
+    if (!Number.isFinite(days) || days <= 0) return null;
+    const base = paybackBase(state);
+    return {
+      result: `${paybackDurationText(days)}回本`,
+      detail: `${base.label} ¥${base.amount.toFixed(2)} ÷ ${paybackCycleLabel(state.paybackCycle)} ¥${state.paybackPrice.toFixed(2)}`,
+    };
+  }
+
+  // 卡片上的圆标：价格预览用 ¥ 字，回本周期用钟表指针，位置和大小跟价格预览的图标对齐。
+  function drawClockBadge(context, cx, cy, radius, { fill, line, hand }) {
+    context.beginPath(); context.arc(cx, cy, radius, 0, Math.PI * 2);
+    if (fill) { context.fillStyle = fill; context.fill(); }
+    if (line) { context.strokeStyle = line; context.lineWidth = 2; context.stroke(); }
+    if (hand) {
+      context.beginPath();
+      context.moveTo(cx, cy - radius * 0.48);
+      context.lineTo(cx, cy);
+      context.lineTo(cx + radius * 0.44, cy + radius * 0.26);
+      context.strokeStyle = hand; context.lineWidth = Math.max(1.4, radius / 9);
+      context.lineCap = 'round'; context.stroke(); context.lineCap = 'butt';
+    }
+    context.textAlign = 'left';
+  }
+
+  // 卡片上的回本周期：和价格预览一样单独一个框，左侧图标 + 「回本周期 + 结果」，公式靠右。
+  // 框和图标交给各卡片风格画（配色跟它们自己的价格预览对齐），这里只管文字排版。
+  function drawPaybackBox(context, payback, { box, icon, x, y, width, height, baseline, labelFont, resultFont, detailFont, labelColor, resultColor, detailColor, padding = 14, iconWidth = 0 }) {
+    if (box) box(context, x, y, width, height);
+    if (icon) icon(context, x + padding + 15, y + height / 2);
+    const labelX = x + padding + iconWidth;
+    context.textAlign = 'left';
+    context.font = labelFont; context.fillStyle = labelColor;
+    const label = '回本周期';
+    context.fillText(label, labelX, baseline);
+    // 先按标签字体量宽度，再切到结果字体去画；否则会拿结果的大字号量标签，多出一段空隙。
+    const labelWidth = context.measureText(label).width;
+    context.font = resultFont; context.fillStyle = resultColor;
+    context.fillText(payback.result, labelX + labelWidth + 9, baseline);
+    context.textAlign = 'right';
+    context.font = detailFont; context.fillStyle = detailColor;
+    context.fillText(payback.detail, x + width - padding, baseline);
+    context.textAlign = 'left';
+  }
+
   // 回填文本照搬出鸡模板「续费与价值」那一段的结构；预出价格、溢价都可有可无。
-  function remainingValueText(state) {
+  // 勾了「回填图片」时把上传好的剩余价值卡片接在整段后面。
+  function remainingValueText(state, cardMarkdown = '') {
     const { values, code, rate, result, remaining } = state;
     // 剩余价值算不出来时（比如没填到期日期），回本周期算得出来的话就单独回填这一行
     if (!result || !Number.isFinite(remaining)) {
       const only = paybackLine(state);
-      return only ? `## 续费与价值\n${only}` : '';
+      const block = [only, cardMarkdown].filter(Boolean).join('\n\n');
+      return block ? `## 续费与价值\n${block}` : '';
     }
     const symbol = currencySymbol(values.currency);
     const renewal = [
@@ -1840,7 +1890,7 @@ function formValues(app) {
     // 回本周期永远排在最后一行，接在预出价格后面。
     const payback = paybackLine(state);
     if (payback) lines.push(payback);
-    return `## 续费与价值\n${lines.join('\n')}`;
+    return `## 续费与价值\n${[lines.join('\n'), cardMarkdown].filter(Boolean).join('\n\n')}`;
   }
 
   function refreshCalcRemaining(app, state) {
@@ -1854,6 +1904,7 @@ function formValues(app) {
     const preview = app.querySelector('[data-nsit-calc-price-preview]');
     const insert = app.querySelector('[data-nsit-calc-remaining-insert]');
     const button = app.querySelector('[data-action="fill-calc-remaining"]');
+    const cardToggle = app.querySelector('.nsit-calc-modal [name="calcGenerateCard"]');
     if (rateLine) rateLine.textContent = calcRateText(app, code, rate);
     if (amount) amount.textContent = Number.isFinite(remaining) ? remaining.toFixed(2) : '—';
     if (days) days.textContent = result ? `剩余 ${result.daysLeft} 天` : '剩余 ? 天';
@@ -1865,6 +1916,8 @@ function formValues(app) {
     const text = remainingValueText(state);
     if (insert) insert.textContent = text || '—';
     if (button) button.disabled = !text;
+    // 图片卡片要有算得出来的剩余价值和汇率才能画，缺数据时先禁用（保留用户的勾选状态）。
+    if (cardToggle) cardToggle.disabled = !(result && Number.isFinite(remaining) && Number.isFinite(rate));
   }
 
   function effectiveCalcAskingPrice(values, remaining) {
@@ -1939,11 +1992,33 @@ function formValues(app) {
     premium.disabled = hasAsking;
   }
 
-  function fillCalcRemaining(app) {
-    const text = remainingValueText(calcRemainingState(app));
-    if (!text) return;
+  async function fillCalcRemaining(app) {
+    const state = calcRemainingState(app);
+    const toggle = app.querySelector('.nsit-calc-modal [name="calcGenerateCard"]');
+    // 勾了「回填图片」就先按当前数据生成剩余价值卡片并上传，拿到图片链接再一起回填。
+    const wantsCard = Boolean(toggle?.checked) && !toggle.disabled;
+    const text = remainingValueText(state);
+    if (!text && !wantsCard) return;
+    let card = '';
+    if (wantsCard) {
+      const button = app.querySelector('[data-action="fill-calc-remaining"]');
+      if (button) button.disabled = true;
+      // 上传期间用和出鸡一样的遮罩 loading，不再走底部状态栏文案。
+      setCalcGenerating(app, true);
+      try {
+        card = await uploadValueCard(state.values, app, { rate: state.rate }, paybackCardState(state));
+      } catch (error) {
+        setCalcGenerating(app, false);
+        setCalcStatus(app, `图片生成失败：${error?.message || '未知错误'}；取消勾选「回填图片」可只回填文字。`);
+        refreshCalcRemaining(app, calcRemainingState(app));
+        return;
+      }
+      setCalcGenerating(app, false);
+    }
+    const content = remainingValueText(state, card);
+    if (!content) return;
     // 回填成功就直接关掉弹窗；只有找不到编辑器这种异常才留在弹窗里提示。
-    if (insertEditorText(app, text)) closeCalcModal(app);
+    if (insertEditorText(app, content)) closeCalcModal(app);
     else setCalcStatus(app, '未找到 NodeSeek 正文编辑器，请刷新页面后重试。');
   }
 
@@ -2067,11 +2142,13 @@ function formValues(app) {
     );
   }
 
-  function createStardewValueCard(values, rate, result, askingPrice, style) {
+  function createStardewValueCard(values, rate, result, askingPrice, style, payback = null) {
     const cardWidth = 600;
     const cardHeight = 275;
+    // 有回本周期时卡片往下接两行，卡片本身的内容位置不动。
+    const extra = payback ? 52 : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = cardWidth * 2; canvas.height = cardHeight * 2;
+    canvas.width = cardWidth * 2; canvas.height = (cardHeight + extra) * 2;
     const background = new Image();
     const seasonName = { 'stardew-spring': '春', 'stardew-summer': '夏', 'stardew-autumn': '秋', 'stardew-winter': '冬' }[style] || '春';
     const accent = { 'stardew-spring': '#519b48', 'stardew-summer': '#d78d25', 'stardew-autumn': '#b65524', 'stardew-winter': '#5194bd' }[style] || '#519b48';
@@ -2098,14 +2175,14 @@ function formValues(app) {
         const dateText = `${seasonName} · ${values.tradeDate || '—'}`;
         const progressText = `${result.daysLeft} / ${result.cycleDays} 天 · ${result.percentage.toFixed(1)}%`;
         const filledPixels = Math.max(0, Math.min(10, Math.round(result.percentage / 10)));
-        context.drawImage(background, 0, 0, cardWidth, cardHeight);
-        context.beginPath(); context.roundRect(1.5, 1.5, 597, 272, 5); context.strokeStyle = '#714321'; context.lineWidth = 3; context.stroke();
-        roundedBox(context, 17, 13, 566, 249, 5, 'rgba(255,243,210,.94)', '#70451f');
-        context.beginPath(); context.roundRect(19.5, 15.5, 561, 244, 4); context.strokeStyle = 'rgba(255,250,229,.68)'; context.lineWidth = 2; context.stroke();
+        context.drawImage(background, 0, 0, cardWidth, cardHeight + extra);
+        context.beginPath(); context.roundRect(1.5, 1.5, 597, 272 + extra, 5); context.strokeStyle = '#714321'; context.lineWidth = 3; context.stroke();
+        roundedBox(context, 17, 13, 566, 249 + extra, 5, 'rgba(255,243,210,.94)', '#70451f');
+        context.beginPath(); context.roundRect(19.5, 15.5, 561, 244 + extra, 4); context.strokeStyle = 'rgba(255,250,229,.68)'; context.lineWidth = 2; context.stroke();
         context.save();
-        context.beginPath(); context.roundRect(19, 15, 562, 245, 4); context.clip();
+        context.beginPath(); context.roundRect(19, 15, 562, 245 + extra, 4); context.clip();
         context.strokeStyle = 'rgba(130,83,39,.10)'; context.lineWidth = 1;
-        for (let y = 31; y < 260; y += 21) { context.beginPath(); context.moveTo(19, y); context.lineTo(581, y); context.stroke(); }
+        for (let y = 31; y < 260 + extra; y += 21) { context.beginPath(); context.moveTo(19, y); context.lineTo(581, y); context.stroke(); }
         context.restore();
 
         roundedBox(context, 30, 27, 132, 22, 6, '#b5d94c', '#518238');
@@ -2153,15 +2230,29 @@ function formValues(app) {
           else if (askingPrice === cny) { previewTop = '剩余价值出'; previewBottom = `总价 ¥${askingPrice.toFixed(2)}`; previewColor = '#27834a'; }
           else { previewTop = `${(askingPrice / cny * 10).toFixed(1)} 折`; previewBottom = `总价 ¥${askingPrice.toFixed(2)} ÷ 剩余价值 ¥${cny.toFixed(2)}`; previewColor = '#27834a'; }
         }
-        roundedBox(context, 31, 200, 538, 43, 5, '#f2d681', '#a6702a');
-        context.beginPath(); context.roundRect(33, 202, 534, 39, 3); context.strokeStyle = '#ffe8a8'; context.lineWidth = 2; context.stroke();
-        roundedBox(context, 42, 208, 29, 29, 15, '#f3b632', '#966326');
-        text(context, '¥', 56.5, 230, `800 16px Georgia`, '#8b5520', 'center');
-        text(context, '价格预览', 82, 228, `700 12px ${sans}`, '#7c4b20');
-        context.font = `800 20px ${sans}`;
-        const previewTopWidth = context.measureText(previewTop).width;
-        text(context, previewTop, 140, 232, `800 20px ${sans}`, previewColor);
-        text(context, previewBottom, Math.min(558, 148 + previewTopWidth), 229, `500 12px ${sans}`, '#89633a');
+        // 价格预览和回本周期共用一套版式：左边图标 + 标签，值往中间靠上，算式贴右。
+        const stardewRow = (rowY, label, value, valueColor, detail) => {
+          const rowHeight = 43;
+          roundedBox(context, 31, rowY, 538, rowHeight, 5, '#f2d681', '#a6702a');
+          context.beginPath(); context.roundRect(33, rowY + 2, 534, rowHeight - 4, 3); context.strokeStyle = '#ffe8a8'; context.lineWidth = 2; context.stroke();
+          roundedBox(context, 42, rowY + 8, 29, 29, 15, '#f3b632', '#966326');
+          text(context, '¥', 56.5, rowY + 30, `800 16px Georgia`, '#8b5520', 'center');
+          text(context, label, 82, rowY + 28, `700 12px ${sans}`, '#7c4b20');
+          text(context, value, 140, rowY + 28, `800 20px ${sans}`, valueColor);
+          if (detail) text(context, detail, 558, rowY + 27, `500 12px ${sans}`, '#89633a', 'right');
+        };
+        stardewRow(197, '价格预览', previewTop, previewColor, previewBottom);
+        if (payback) {
+          const rowY = 247;
+          roundedBox(context, 31, rowY, 538, 43, 5, '#f2d681', '#a6702a');
+          context.beginPath(); context.roundRect(33, rowY + 2, 534, 39, 3); context.strokeStyle = '#ffe8a8'; context.lineWidth = 2; context.stroke();
+          drawClockBadge(context, 56.5, rowY + 22, 14.5, { fill: '#f3b632', line: '#966326', hand: '#8b5520' });
+          drawPaybackBox(context, payback, {
+            x: 31, y: rowY, width: 538, height: 43, baseline: rowY + 28, padding: 12, iconWidth: 39,
+            labelFont: `700 12px ${sans}`, resultFont: `800 20px ${sans}`, detailFont: `500 12px ${sans}`,
+            labelColor: '#7c4b20', resultColor: '#27834a', detailColor: '#89633a',
+          });
+        }
         canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png');
       };
       background.onerror = () => reject(new Error('卡片背景加载失败'));
@@ -2170,11 +2261,12 @@ function formValues(app) {
     });
   }
 
-  function createCustomValueCard(values, rate, result, askingPrice, backgroundSource) {
+  function createCustomValueCard(values, rate, result, askingPrice, backgroundSource, payback = null) {
     const cardWidth = 600;
     const cardHeight = 275;
+    const extra = payback ? 60 : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = cardWidth * 2; canvas.height = cardHeight * 2;
+    canvas.width = cardWidth * 2; canvas.height = (cardHeight + extra) * 2;
     const background = new Image();
     const box = (context, x, y, width, height, radius, fill, stroke = '') => {
       context.beginPath(); context.roundRect(x, y, width, height, radius);
@@ -2214,13 +2306,14 @@ function formValues(app) {
         const shade = backdropContext.createLinearGradient(0, 0, 600, 275);
         shade.addColorStop(0, 'rgba(72,192,255,.08)'); shade.addColorStop(.48, 'rgba(255,255,255,.03)'); shade.addColorStop(1, 'rgba(255,182,127,.08)');
         backdropContext.fillStyle = shade; backdropContext.fillRect(0, 0, 600, 275); backdropContext.restore();
-        context.save(); context.beginPath(); context.roundRect(0, 0, 600, 275, 24); context.clip();
+        context.save(); context.beginPath(); context.roundRect(0, 0, 600, 275 + extra, 24); context.clip();
         context.drawImage(backdrop, 0, 0, cardWidth, cardHeight);
-        context.filter = 'blur(4px) saturate(160%)'; context.drawImage(backdrop, 0, 0, cardWidth, cardHeight); context.filter = 'none';
-        context.fillStyle = 'rgba(255,255,255,.10)'; context.fillRect(0, 0, 600, 275);
+        context.filter = 'blur(4px) saturate(160%)'; context.drawImage(backdrop, 0, 0, cardWidth, cardHeight + extra); context.filter = 'none';
+        context.fillStyle = 'rgba(255,255,255,.10)'; context.fillRect(0, 0, 600, 275 + extra);
+        if (payback) { context.fillStyle = 'rgba(8,32,52,.34)'; context.fillRect(0, 275, 600, extra); }
         const top = context.createLinearGradient(0, 0, 600, 0); top.addColorStop(0, '#83e7ff'); top.addColorStop(.48, '#fff19a'); top.addColorStop(1, '#ffb3d5'); context.fillStyle = top; context.fillRect(0, 0, 600, 4);
         context.restore();
-        context.beginPath(); context.roundRect(.5, .5, 599, 274, 24); context.strokeStyle = 'rgba(255,255,255,.56)'; context.stroke();
+        context.beginPath(); context.roundRect(.5, .5, 599, 274 + extra, 24); context.strokeStyle = 'rgba(255,255,255,.56)'; context.stroke();
         text(context, '剩余价值', 24, 32, `800 14px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)');
         text(context, `¥${cny.toFixed(2)}`, 24, 65, `800 30px ${sans}`, '#fff36b', 'left', 'rgba(80,50,0,.58)');
         text(context, '价值计算日期', 576, 29, `700 12px ${sans}`, '#fff', 'right', 'rgba(7,42,67,.58)');
@@ -2240,8 +2333,23 @@ function formValues(app) {
         box(context, 300, 159, 276, 34, 12, 'rgba(255,255,255,.13)');
         text(context, '剩余百分比', 37, 181, `700 12px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)'); text(context, `${result.percentage.toFixed(1)}%`, 275, 181, `700 15px ${sans}`, '#fff069', 'right', 'rgba(80,50,0,.6)');
         text(context, '今日汇率', 313, 181, `700 12px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)'); text(context, rateText, 563, 181, `700 15px ${sans}`, '#91ffb2', 'right', 'rgba(0,74,37,.7)');
-        context.beginPath(); context.moveTo(24, 214.5); context.lineTo(576, 214.5); context.strokeStyle = 'rgba(255,255,255,.35)'; context.stroke();
-        text(context, '价格预览', 24, 244, `800 13px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)'); text(context, preview, 576, 246, `800 21px ${sans}`, previewColor, 'right', previewColor === '#ff95ca' ? 'rgba(105,0,55,.68)' : 'rgba(0,74,37,.7)');
+        // 和上面「剩余百分比 / 今日汇率」同款半透明卡片：左图标 + 标签，值靠中，公式贴右。
+        const customRow = (rowY, label, value, valueColor, detail, iconDraw) => {
+          box(context, 24, rowY, 552, 42, 12, 'rgba(255,255,255,.13)');
+          if (iconDraw) iconDraw(context, 45, rowY + 21);
+          text(context, label, 68, rowY + 26, `700 12px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)');
+          text(context, value, 132, rowY + 27, `800 19px ${sans}`, valueColor, 'left', valueColor === '#91ffb2' ? 'rgba(0,74,37,.7)' : 'rgba(105,0,55,.68)');
+          if (detail) text(context, detail, 563, rowY + 26, `500 12px ${sans}`, '#bfe9ff', 'right', 'rgba(0,67,93,.68)');
+        };
+        customRow(219, '价格预览', preview, previewColor, '', null);
+        if (payback) {
+          customRow(269, '回本周期', payback.result, '#91ffb2', payback.detail, (target, cx, cy) => {
+            target.save(); target.beginPath(); target.arc(cx, cy, 12, 0, Math.PI * 2); target.fillStyle = 'rgba(255,255,255,.22)'; target.fill();
+            target.strokeStyle = '#fff'; target.lineWidth = 1.4; target.stroke();
+            target.beginPath(); target.moveTo(cx, cy - 5.5); target.lineTo(cx, cy); target.lineTo(cx + 5, cy + 3);
+            target.strokeStyle = '#fff'; target.lineWidth = 1.6; target.lineCap = 'round'; target.stroke(); target.lineCap = 'butt'; target.restore();
+          });
+        }
         canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png');
       };
       background.onerror = () => reject(new Error('自定义背景加载失败'));
@@ -2249,11 +2357,12 @@ function formValues(app) {
     });
   }
 
-  function createTankValueCard(values, rate, result, askingPrice) {
+  function createTankValueCard(values, rate, result, askingPrice, payback = null) {
     const cardWidth = 600;
     const cardHeight = 275;
+    const extra = payback ? 54 : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = cardWidth * 2; canvas.height = cardHeight * 2;
+    canvas.width = cardWidth * 2; canvas.height = (cardHeight + extra) * 2;
     const background = new Image();
     const text = (context, value, x, y, font, color, align = 'left') => {
       context.font = font;
@@ -2286,9 +2395,9 @@ function formValues(app) {
           else { previewTop = `${(askingPrice / cny * 10).toFixed(1)} 折`; previewColor = '#6ac66f'; }
         }
 
-        context.drawImage(background, 0, 0, cardWidth, cardHeight);
-        context.strokeStyle = '#b8b9b4'; context.lineWidth = 3; context.strokeRect(10.5, 10.5, 579, 254);
-        context.strokeStyle = '#30312e'; context.lineWidth = 1; context.strokeRect(14.5, 14.5, 571, 246);
+        context.drawImage(background, 0, 0, cardWidth, cardHeight + extra);
+        context.strokeStyle = '#b8b9b4'; context.lineWidth = 3; context.strokeRect(10.5, 10.5, 579, 254 + extra);
+        context.strokeStyle = '#30312e'; context.lineWidth = 1; context.strokeRect(14.5, 14.5, 571, 246 + extra);
         context.beginPath(); context.moveTo(137.5, 10); context.lineTo(137.5, 265); context.moveTo(462.5, 10); context.lineTo(462.5, 265); context.strokeStyle = '#f4f0df'; context.lineWidth = 2; context.stroke();
         text(context, '剩余价值', 148, 31, `900 15px ${font}`, '#b94b4a');
         text(context, `¥${cny.toFixed(2)}`, 452, 31, `900 16px ${font}`, '#d7bb82', 'right');
@@ -2304,9 +2413,36 @@ function formValues(app) {
           }
         });
 
-        context.beginPath(); context.moveTo(148, 234); context.lineTo(452, 234); context.strokeStyle = '#f4f0df'; context.lineWidth = 2; context.stroke();
-        text(context, '价格预览', 148, 257, `900 14px ${font}`, '#f4f0df');
-        text(context, previewTop, 452, 257, `900 15px ${font}`, previewColor, 'right');
+        // 价格预览和回本周期共用一套版式：方框 + 左侧圆标（¥ / 钟表）+ 标签，值靠中，公式贴右。
+        const tankRow = (rowY, label, value, valueColor, detail) => {
+          const rowHeight = 30;
+          context.fillStyle = 'rgba(0,0,0,.9)'; context.fillRect(145, rowY - 2, 310, rowHeight + 4);
+          context.strokeStyle = '#f4f0df'; context.lineWidth = 1; context.strokeRect(147.5, rowY + .5, 305, rowHeight - 1);
+          context.strokeStyle = '#555'; context.lineWidth = 1; context.strokeRect(150.5, rowY + 3.5, 299, rowHeight - 7);
+          const cx = 165; const cy = rowY + rowHeight / 2;
+          context.beginPath(); context.arc(cx, cy, 9, 0, Math.PI * 2); context.strokeStyle = '#f4f0df'; context.lineWidth = 1; context.stroke();
+          if (label === '价格预览') text(context, '¥', cx, cy + 4, `900 11px ${font}`, '#d7bb82', 'center');
+          else {
+            context.beginPath(); context.moveTo(cx, cy - 4); context.lineTo(cx, cy); context.lineTo(cx + 3.6, cy + 2.2);
+            context.strokeStyle = '#6ac66f'; context.lineWidth = 1.4; context.lineCap = 'round'; context.stroke(); context.lineCap = 'butt';
+          }
+          context.font = `900 11px ${font}`;
+          text(context, label, 178, rowY + 20, `900 11px ${font}`, '#f4f0df');
+          const valueX = 178 + context.measureText(label).width + 9;
+          text(context, value, valueX, rowY + 20, `900 12px ${font}`, valueColor);
+          if (detail) {
+            // 公式贴右；等宽字体在真实环境里偏宽，按剩余空间逐级缩到放得下为止。
+            context.font = `900 12px ${font}`;
+            const valueEnd = valueX + context.measureText(value).width;
+            for (const size of [9, 8, 7]) {
+              context.font = `700 ${size}px ${font}`;
+              const width = context.measureText(detail).width;
+              if (valueEnd + 10 + width <= 446) { text(context, detail, 446, rowY + 19, `700 ${size}px ${font}`, '#d7bb82', 'right'); break; }
+            }
+          }
+        };
+        tankRow(236, '价格预览', previewTop, previewColor, '');
+        if (payback) tankRow(272, '回本周期', payback.result, '#6ac66f', payback.detail);
         canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png');
       };
       background.onerror = () => reject(new Error('卡片背景加载失败'));
@@ -2315,7 +2451,7 @@ function formValues(app) {
     });
   }
 
-  function createValueCard(values, app, rate = activeRate(app)) {
+  function createValueCard(values, app, rate = activeRate(app), payback = null) {
     const result = calculation(values);
     if (!result || !rate) throw new Error('请先填写有效的续费信息并等待汇率加载完成');
     const askingPrice = effectiveAskingPrice(values, rate);
@@ -2323,14 +2459,15 @@ function formValues(app) {
     const style = settings.valueCardStyle;
     if (style === 'custom') {
       if (!settings.customValueCardBackground) throw new Error('请先在个性化配置上传自定义背景');
-      return createCustomValueCard(values, rate, result, askingPrice, settings.customValueCardBackground);
+      return createCustomValueCard(values, rate, result, askingPrice, settings.customValueCardBackground, payback);
     }
-    if (style === 'tank') return createTankValueCard(values, rate, result, askingPrice);
-    if (style !== 'default') return createStardewValueCard(values, rate, result, askingPrice, style);
+    if (style === 'tank') return createTankValueCard(values, rate, result, askingPrice, payback);
+    if (style !== 'default') return createStardewValueCard(values, rate, result, askingPrice, style, payback);
     const cny = result.value * rate.rate;
     const canvas = document.createElement('canvas');
     const cardWidth = 1200;
     const cardHeight = 550;
+    // 默认样式本来就有富余高度，回本周期直接画在底部留白里，不用加高。
     canvas.width = cardWidth; canvas.height = cardHeight;
     const context = canvas.getContext('2d');
     const roundedBox = (x, y, width, height, radius, fill, stroke = '') => {
@@ -2390,14 +2527,30 @@ function formValues(app) {
       else { previewTop = `${(askingPrice / cny * 10).toFixed(1)} 折`; previewBottom = `总价 ¥${askingPrice.toFixed(2)} ÷ 剩余价值 ¥${cny.toFixed(2)}`; previewColor = '#27834a'; }
     }
     roundedBox(592, 264, 576, 238, 20, '#fff', '#dfe7f0');
+    // 图标 + 标签在上、值居中略偏上，公式统一贴右边，和回本周期那条对齐。
+    roundedBox(620, 292, 44, 44, 22, '#fff3d8', '#efd39a');
+    context.fillStyle = '#d9961c'; context.font = `750 26px Georgia`; context.textAlign = 'center';
+    context.fillText('¥', 642, 323); context.textAlign = 'left';
     context.fillStyle = '#52627c'; context.font = `600 22px ${sans}`;
-    context.fillText('价格预览', 620, 305);
-    context.fillStyle = previewColor; context.font = `750 65px ${sans}`;
-    context.fillText(previewTop, 620, 391);
+    context.fillText('价格预览', 680, 322);
+    context.fillStyle = previewColor; context.font = `750 60px ${sans}`;
+    context.fillText(previewTop, 620, 400);
+    context.textAlign = 'right';
     context.fillStyle = '#718096'; context.font = `500 20px ${sans}`;
-    context.fillText(previewBottom, 620, 438);
+    context.fillText(previewBottom, 1140, 400);
+    context.textAlign = 'left';
     context.fillStyle = '#95a3b8'; context.font = `400 18px ${sans}`;
-    context.fillText('价格以人民币计算', 620, 474);
+    context.fillText('价格以人民币计算', 620, 462);
+    if (payback) {
+      // 和上面两个框一样是白底描边的框，左侧钟表圆标，结果用绿色，公式接到右边。
+      drawPaybackBox(context, payback, {
+        x: 32, y: 508, width: 1136, height: 38, baseline: 534, padding: 24, iconWidth: 39,
+        box: (target, boxX, boxY, boxWidth, boxHeight) => roundedBox(target, boxX, boxY, boxWidth, boxHeight, 16, '#fff', '#dfe7f0'),
+        icon: (target, cx, cy) => drawClockBadge(target, cx, cy, 15, { fill: '#fff3d8', line: '#efd39a', hand: '#d9961c' }),
+        labelFont: `600 20px ${sans}`, resultFont: `750 24px ${sans}`, detailFont: `400 18px ${sans}`,
+        labelColor: '#718096', resultColor: '#27834a', detailColor: '#95a3b8',
+      });
+    }
     return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png'));
   }
 
@@ -2417,8 +2570,8 @@ function formValues(app) {
     return response.api_key;
   }
 
-  async function uploadValueCard(values, app, rate) {
-    const blob = await createValueCard(values, app, rate);
+  async function uploadValueCard(values, app, rate, payback = null) {
+    const blob = await createValueCard(values, app, rate, payback);
     const upload = async (forceKey = false) => {
       const data = new FormData();
       data.append('image', new File([blob], 'nodeseek-value-card.png', { type: 'image/png' }));
@@ -3226,6 +3379,12 @@ function formValues(app) {
     app.classList.remove('nsit-calc-open');
     app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'true');
     setCalcStatus(app, '');
+  }
+
+  // 计算器里上传图片时借用出鸡那套遮罩 loading，只是挂在计算器弹窗上。
+  function setCalcGenerating(app, generating) {
+    app.classList.toggle('nsit-calc-generating', generating);
+    app.querySelector('.nsit-calc-loading')?.setAttribute('aria-hidden', String(!generating));
   }
 
   function catalogApiUrl(path, params = null) {

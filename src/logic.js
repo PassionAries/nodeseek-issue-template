@@ -813,13 +813,62 @@
     return `- 回本周期：${paybackDurationText(days)}（${base.label} ¥${base.amount.toFixed(2)} ÷ ${costText}）`;
   }
 
+  // 卡片最底下那行回本周期：结果 + 算式，算不出来就整行不画。
+  function paybackCardState(state) {
+    const days = paybackDays(state, paybackPerDay(state));
+    if (!Number.isFinite(days) || days <= 0) return null;
+    const base = paybackBase(state);
+    return {
+      result: `${paybackDurationText(days)}回本`,
+      detail: `${base.label} ¥${base.amount.toFixed(2)} ÷ ${paybackCycleLabel(state.paybackCycle)} ¥${state.paybackPrice.toFixed(2)}`,
+    };
+  }
+
+  // 卡片上的圆标：价格预览用 ¥ 字，回本周期用钟表指针，位置和大小跟价格预览的图标对齐。
+  function drawClockBadge(context, cx, cy, radius, { fill, line, hand }) {
+    context.beginPath(); context.arc(cx, cy, radius, 0, Math.PI * 2);
+    if (fill) { context.fillStyle = fill; context.fill(); }
+    if (line) { context.strokeStyle = line; context.lineWidth = 2; context.stroke(); }
+    if (hand) {
+      context.beginPath();
+      context.moveTo(cx, cy - radius * 0.48);
+      context.lineTo(cx, cy);
+      context.lineTo(cx + radius * 0.44, cy + radius * 0.26);
+      context.strokeStyle = hand; context.lineWidth = Math.max(1.4, radius / 9);
+      context.lineCap = 'round'; context.stroke(); context.lineCap = 'butt';
+    }
+    context.textAlign = 'left';
+  }
+
+  // 卡片上的回本周期：和价格预览一样单独一个框，左侧图标 + 「回本周期 + 结果」，公式靠右。
+  // 框和图标交给各卡片风格画（配色跟它们自己的价格预览对齐），这里只管文字排版。
+  function drawPaybackBox(context, payback, { box, icon, x, y, width, height, baseline, labelFont, resultFont, detailFont, labelColor, resultColor, detailColor, padding = 14, iconWidth = 0 }) {
+    if (box) box(context, x, y, width, height);
+    if (icon) icon(context, x + padding + 15, y + height / 2);
+    const labelX = x + padding + iconWidth;
+    context.textAlign = 'left';
+    context.font = labelFont; context.fillStyle = labelColor;
+    const label = '回本周期';
+    context.fillText(label, labelX, baseline);
+    // 先按标签字体量宽度，再切到结果字体去画；否则会拿结果的大字号量标签，多出一段空隙。
+    const labelWidth = context.measureText(label).width;
+    context.font = resultFont; context.fillStyle = resultColor;
+    context.fillText(payback.result, labelX + labelWidth + 9, baseline);
+    context.textAlign = 'right';
+    context.font = detailFont; context.fillStyle = detailColor;
+    context.fillText(payback.detail, x + width - padding, baseline);
+    context.textAlign = 'left';
+  }
+
   // 回填文本照搬出鸡模板「续费与价值」那一段的结构；预出价格、溢价都可有可无。
-  function remainingValueText(state) {
+  // 勾了「回填图片」时把上传好的剩余价值卡片接在整段后面。
+  function remainingValueText(state, cardMarkdown = '') {
     const { values, code, rate, result, remaining } = state;
     // 剩余价值算不出来时（比如没填到期日期），回本周期算得出来的话就单独回填这一行
     if (!result || !Number.isFinite(remaining)) {
       const only = paybackLine(state);
-      return only ? `## 续费与价值\n${only}` : '';
+      const block = [only, cardMarkdown].filter(Boolean).join('\n\n');
+      return block ? `## 续费与价值\n${block}` : '';
     }
     const symbol = currencySymbol(values.currency);
     const renewal = [
@@ -840,7 +889,7 @@
     // 回本周期永远排在最后一行，接在预出价格后面。
     const payback = paybackLine(state);
     if (payback) lines.push(payback);
-    return `## 续费与价值\n${lines.join('\n')}`;
+    return `## 续费与价值\n${[lines.join('\n'), cardMarkdown].filter(Boolean).join('\n\n')}`;
   }
 
   function refreshCalcRemaining(app, state) {
@@ -854,6 +903,7 @@
     const preview = app.querySelector('[data-nsit-calc-price-preview]');
     const insert = app.querySelector('[data-nsit-calc-remaining-insert]');
     const button = app.querySelector('[data-action="fill-calc-remaining"]');
+    const cardToggle = app.querySelector('.nsit-calc-modal [name="calcGenerateCard"]');
     if (rateLine) rateLine.textContent = calcRateText(app, code, rate);
     if (amount) amount.textContent = Number.isFinite(remaining) ? remaining.toFixed(2) : '—';
     if (days) days.textContent = result ? `剩余 ${result.daysLeft} 天` : '剩余 ? 天';
@@ -865,6 +915,8 @@
     const text = remainingValueText(state);
     if (insert) insert.textContent = text || '—';
     if (button) button.disabled = !text;
+    // 图片卡片要有算得出来的剩余价值和汇率才能画，缺数据时先禁用（保留用户的勾选状态）。
+    if (cardToggle) cardToggle.disabled = !(result && Number.isFinite(remaining) && Number.isFinite(rate));
   }
 
   function effectiveCalcAskingPrice(values, remaining) {
@@ -939,11 +991,33 @@
     premium.disabled = hasAsking;
   }
 
-  function fillCalcRemaining(app) {
-    const text = remainingValueText(calcRemainingState(app));
-    if (!text) return;
+  async function fillCalcRemaining(app) {
+    const state = calcRemainingState(app);
+    const toggle = app.querySelector('.nsit-calc-modal [name="calcGenerateCard"]');
+    // 勾了「回填图片」就先按当前数据生成剩余价值卡片并上传，拿到图片链接再一起回填。
+    const wantsCard = Boolean(toggle?.checked) && !toggle.disabled;
+    const text = remainingValueText(state);
+    if (!text && !wantsCard) return;
+    let card = '';
+    if (wantsCard) {
+      const button = app.querySelector('[data-action="fill-calc-remaining"]');
+      if (button) button.disabled = true;
+      // 上传期间用和出鸡一样的遮罩 loading，不再走底部状态栏文案。
+      setCalcGenerating(app, true);
+      try {
+        card = await uploadValueCard(state.values, app, { rate: state.rate }, paybackCardState(state));
+      } catch (error) {
+        setCalcGenerating(app, false);
+        setCalcStatus(app, `图片生成失败：${error?.message || '未知错误'}；取消勾选「回填图片」可只回填文字。`);
+        refreshCalcRemaining(app, calcRemainingState(app));
+        return;
+      }
+      setCalcGenerating(app, false);
+    }
+    const content = remainingValueText(state, card);
+    if (!content) return;
     // 回填成功就直接关掉弹窗；只有找不到编辑器这种异常才留在弹窗里提示。
-    if (insertEditorText(app, text)) closeCalcModal(app);
+    if (insertEditorText(app, content)) closeCalcModal(app);
     else setCalcStatus(app, '未找到 NodeSeek 正文编辑器，请刷新页面后重试。');
   }
 
@@ -1067,11 +1141,13 @@
     );
   }
 
-  function createStardewValueCard(values, rate, result, askingPrice, style) {
+  function createStardewValueCard(values, rate, result, askingPrice, style, payback = null) {
     const cardWidth = 600;
     const cardHeight = 275;
+    // 有回本周期时卡片往下接两行，卡片本身的内容位置不动。
+    const extra = payback ? 52 : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = cardWidth * 2; canvas.height = cardHeight * 2;
+    canvas.width = cardWidth * 2; canvas.height = (cardHeight + extra) * 2;
     const background = new Image();
     const seasonName = { 'stardew-spring': '春', 'stardew-summer': '夏', 'stardew-autumn': '秋', 'stardew-winter': '冬' }[style] || '春';
     const accent = { 'stardew-spring': '#519b48', 'stardew-summer': '#d78d25', 'stardew-autumn': '#b65524', 'stardew-winter': '#5194bd' }[style] || '#519b48';
@@ -1098,14 +1174,14 @@
         const dateText = `${seasonName} · ${values.tradeDate || '—'}`;
         const progressText = `${result.daysLeft} / ${result.cycleDays} 天 · ${result.percentage.toFixed(1)}%`;
         const filledPixels = Math.max(0, Math.min(10, Math.round(result.percentage / 10)));
-        context.drawImage(background, 0, 0, cardWidth, cardHeight);
-        context.beginPath(); context.roundRect(1.5, 1.5, 597, 272, 5); context.strokeStyle = '#714321'; context.lineWidth = 3; context.stroke();
-        roundedBox(context, 17, 13, 566, 249, 5, 'rgba(255,243,210,.94)', '#70451f');
-        context.beginPath(); context.roundRect(19.5, 15.5, 561, 244, 4); context.strokeStyle = 'rgba(255,250,229,.68)'; context.lineWidth = 2; context.stroke();
+        context.drawImage(background, 0, 0, cardWidth, cardHeight + extra);
+        context.beginPath(); context.roundRect(1.5, 1.5, 597, 272 + extra, 5); context.strokeStyle = '#714321'; context.lineWidth = 3; context.stroke();
+        roundedBox(context, 17, 13, 566, 249 + extra, 5, 'rgba(255,243,210,.94)', '#70451f');
+        context.beginPath(); context.roundRect(19.5, 15.5, 561, 244 + extra, 4); context.strokeStyle = 'rgba(255,250,229,.68)'; context.lineWidth = 2; context.stroke();
         context.save();
-        context.beginPath(); context.roundRect(19, 15, 562, 245, 4); context.clip();
+        context.beginPath(); context.roundRect(19, 15, 562, 245 + extra, 4); context.clip();
         context.strokeStyle = 'rgba(130,83,39,.10)'; context.lineWidth = 1;
-        for (let y = 31; y < 260; y += 21) { context.beginPath(); context.moveTo(19, y); context.lineTo(581, y); context.stroke(); }
+        for (let y = 31; y < 260 + extra; y += 21) { context.beginPath(); context.moveTo(19, y); context.lineTo(581, y); context.stroke(); }
         context.restore();
 
         roundedBox(context, 30, 27, 132, 22, 6, '#b5d94c', '#518238');
@@ -1153,15 +1229,29 @@
           else if (askingPrice === cny) { previewTop = '剩余价值出'; previewBottom = `总价 ¥${askingPrice.toFixed(2)}`; previewColor = '#27834a'; }
           else { previewTop = `${(askingPrice / cny * 10).toFixed(1)} 折`; previewBottom = `总价 ¥${askingPrice.toFixed(2)} ÷ 剩余价值 ¥${cny.toFixed(2)}`; previewColor = '#27834a'; }
         }
-        roundedBox(context, 31, 200, 538, 43, 5, '#f2d681', '#a6702a');
-        context.beginPath(); context.roundRect(33, 202, 534, 39, 3); context.strokeStyle = '#ffe8a8'; context.lineWidth = 2; context.stroke();
-        roundedBox(context, 42, 208, 29, 29, 15, '#f3b632', '#966326');
-        text(context, '¥', 56.5, 230, `800 16px Georgia`, '#8b5520', 'center');
-        text(context, '价格预览', 82, 228, `700 12px ${sans}`, '#7c4b20');
-        context.font = `800 20px ${sans}`;
-        const previewTopWidth = context.measureText(previewTop).width;
-        text(context, previewTop, 140, 232, `800 20px ${sans}`, previewColor);
-        text(context, previewBottom, Math.min(558, 148 + previewTopWidth), 229, `500 12px ${sans}`, '#89633a');
+        // 价格预览和回本周期共用一套版式：左边图标 + 标签，值往中间靠上，算式贴右。
+        const stardewRow = (rowY, label, value, valueColor, detail) => {
+          const rowHeight = 43;
+          roundedBox(context, 31, rowY, 538, rowHeight, 5, '#f2d681', '#a6702a');
+          context.beginPath(); context.roundRect(33, rowY + 2, 534, rowHeight - 4, 3); context.strokeStyle = '#ffe8a8'; context.lineWidth = 2; context.stroke();
+          roundedBox(context, 42, rowY + 8, 29, 29, 15, '#f3b632', '#966326');
+          text(context, '¥', 56.5, rowY + 30, `800 16px Georgia`, '#8b5520', 'center');
+          text(context, label, 82, rowY + 28, `700 12px ${sans}`, '#7c4b20');
+          text(context, value, 140, rowY + 28, `800 20px ${sans}`, valueColor);
+          if (detail) text(context, detail, 558, rowY + 27, `500 12px ${sans}`, '#89633a', 'right');
+        };
+        stardewRow(197, '价格预览', previewTop, previewColor, previewBottom);
+        if (payback) {
+          const rowY = 247;
+          roundedBox(context, 31, rowY, 538, 43, 5, '#f2d681', '#a6702a');
+          context.beginPath(); context.roundRect(33, rowY + 2, 534, 39, 3); context.strokeStyle = '#ffe8a8'; context.lineWidth = 2; context.stroke();
+          drawClockBadge(context, 56.5, rowY + 22, 14.5, { fill: '#f3b632', line: '#966326', hand: '#8b5520' });
+          drawPaybackBox(context, payback, {
+            x: 31, y: rowY, width: 538, height: 43, baseline: rowY + 28, padding: 12, iconWidth: 39,
+            labelFont: `700 12px ${sans}`, resultFont: `800 20px ${sans}`, detailFont: `500 12px ${sans}`,
+            labelColor: '#7c4b20', resultColor: '#27834a', detailColor: '#89633a',
+          });
+        }
         canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png');
       };
       background.onerror = () => reject(new Error('卡片背景加载失败'));
@@ -1170,11 +1260,12 @@
     });
   }
 
-  function createCustomValueCard(values, rate, result, askingPrice, backgroundSource) {
+  function createCustomValueCard(values, rate, result, askingPrice, backgroundSource, payback = null) {
     const cardWidth = 600;
     const cardHeight = 275;
+    const extra = payback ? 60 : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = cardWidth * 2; canvas.height = cardHeight * 2;
+    canvas.width = cardWidth * 2; canvas.height = (cardHeight + extra) * 2;
     const background = new Image();
     const box = (context, x, y, width, height, radius, fill, stroke = '') => {
       context.beginPath(); context.roundRect(x, y, width, height, radius);
@@ -1214,13 +1305,14 @@
         const shade = backdropContext.createLinearGradient(0, 0, 600, 275);
         shade.addColorStop(0, 'rgba(72,192,255,.08)'); shade.addColorStop(.48, 'rgba(255,255,255,.03)'); shade.addColorStop(1, 'rgba(255,182,127,.08)');
         backdropContext.fillStyle = shade; backdropContext.fillRect(0, 0, 600, 275); backdropContext.restore();
-        context.save(); context.beginPath(); context.roundRect(0, 0, 600, 275, 24); context.clip();
+        context.save(); context.beginPath(); context.roundRect(0, 0, 600, 275 + extra, 24); context.clip();
         context.drawImage(backdrop, 0, 0, cardWidth, cardHeight);
-        context.filter = 'blur(4px) saturate(160%)'; context.drawImage(backdrop, 0, 0, cardWidth, cardHeight); context.filter = 'none';
-        context.fillStyle = 'rgba(255,255,255,.10)'; context.fillRect(0, 0, 600, 275);
+        context.filter = 'blur(4px) saturate(160%)'; context.drawImage(backdrop, 0, 0, cardWidth, cardHeight + extra); context.filter = 'none';
+        context.fillStyle = 'rgba(255,255,255,.10)'; context.fillRect(0, 0, 600, 275 + extra);
+        if (payback) { context.fillStyle = 'rgba(8,32,52,.34)'; context.fillRect(0, 275, 600, extra); }
         const top = context.createLinearGradient(0, 0, 600, 0); top.addColorStop(0, '#83e7ff'); top.addColorStop(.48, '#fff19a'); top.addColorStop(1, '#ffb3d5'); context.fillStyle = top; context.fillRect(0, 0, 600, 4);
         context.restore();
-        context.beginPath(); context.roundRect(.5, .5, 599, 274, 24); context.strokeStyle = 'rgba(255,255,255,.56)'; context.stroke();
+        context.beginPath(); context.roundRect(.5, .5, 599, 274 + extra, 24); context.strokeStyle = 'rgba(255,255,255,.56)'; context.stroke();
         text(context, '剩余价值', 24, 32, `800 14px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)');
         text(context, `¥${cny.toFixed(2)}`, 24, 65, `800 30px ${sans}`, '#fff36b', 'left', 'rgba(80,50,0,.58)');
         text(context, '价值计算日期', 576, 29, `700 12px ${sans}`, '#fff', 'right', 'rgba(7,42,67,.58)');
@@ -1240,8 +1332,23 @@
         box(context, 300, 159, 276, 34, 12, 'rgba(255,255,255,.13)');
         text(context, '剩余百分比', 37, 181, `700 12px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)'); text(context, `${result.percentage.toFixed(1)}%`, 275, 181, `700 15px ${sans}`, '#fff069', 'right', 'rgba(80,50,0,.6)');
         text(context, '今日汇率', 313, 181, `700 12px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)'); text(context, rateText, 563, 181, `700 15px ${sans}`, '#91ffb2', 'right', 'rgba(0,74,37,.7)');
-        context.beginPath(); context.moveTo(24, 214.5); context.lineTo(576, 214.5); context.strokeStyle = 'rgba(255,255,255,.35)'; context.stroke();
-        text(context, '价格预览', 24, 244, `800 13px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)'); text(context, preview, 576, 246, `800 21px ${sans}`, previewColor, 'right', previewColor === '#ff95ca' ? 'rgba(105,0,55,.68)' : 'rgba(0,74,37,.7)');
+        // 和上面「剩余百分比 / 今日汇率」同款半透明卡片：左图标 + 标签，值靠中，公式贴右。
+        const customRow = (rowY, label, value, valueColor, detail, iconDraw) => {
+          box(context, 24, rowY, 552, 42, 12, 'rgba(255,255,255,.13)');
+          if (iconDraw) iconDraw(context, 45, rowY + 21);
+          text(context, label, 68, rowY + 26, `700 12px ${sans}`, '#fff', 'left', 'rgba(7,42,67,.58)');
+          text(context, value, 132, rowY + 27, `800 19px ${sans}`, valueColor, 'left', valueColor === '#91ffb2' ? 'rgba(0,74,37,.7)' : 'rgba(105,0,55,.68)');
+          if (detail) text(context, detail, 563, rowY + 26, `500 12px ${sans}`, '#bfe9ff', 'right', 'rgba(0,67,93,.68)');
+        };
+        customRow(219, '价格预览', preview, previewColor, '', null);
+        if (payback) {
+          customRow(269, '回本周期', payback.result, '#91ffb2', payback.detail, (target, cx, cy) => {
+            target.save(); target.beginPath(); target.arc(cx, cy, 12, 0, Math.PI * 2); target.fillStyle = 'rgba(255,255,255,.22)'; target.fill();
+            target.strokeStyle = '#fff'; target.lineWidth = 1.4; target.stroke();
+            target.beginPath(); target.moveTo(cx, cy - 5.5); target.lineTo(cx, cy); target.lineTo(cx + 5, cy + 3);
+            target.strokeStyle = '#fff'; target.lineWidth = 1.6; target.lineCap = 'round'; target.stroke(); target.lineCap = 'butt'; target.restore();
+          });
+        }
         canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png');
       };
       background.onerror = () => reject(new Error('自定义背景加载失败'));
@@ -1249,11 +1356,12 @@
     });
   }
 
-  function createTankValueCard(values, rate, result, askingPrice) {
+  function createTankValueCard(values, rate, result, askingPrice, payback = null) {
     const cardWidth = 600;
     const cardHeight = 275;
+    const extra = payback ? 54 : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = cardWidth * 2; canvas.height = cardHeight * 2;
+    canvas.width = cardWidth * 2; canvas.height = (cardHeight + extra) * 2;
     const background = new Image();
     const text = (context, value, x, y, font, color, align = 'left') => {
       context.font = font;
@@ -1286,9 +1394,9 @@
           else { previewTop = `${(askingPrice / cny * 10).toFixed(1)} 折`; previewColor = '#6ac66f'; }
         }
 
-        context.drawImage(background, 0, 0, cardWidth, cardHeight);
-        context.strokeStyle = '#b8b9b4'; context.lineWidth = 3; context.strokeRect(10.5, 10.5, 579, 254);
-        context.strokeStyle = '#30312e'; context.lineWidth = 1; context.strokeRect(14.5, 14.5, 571, 246);
+        context.drawImage(background, 0, 0, cardWidth, cardHeight + extra);
+        context.strokeStyle = '#b8b9b4'; context.lineWidth = 3; context.strokeRect(10.5, 10.5, 579, 254 + extra);
+        context.strokeStyle = '#30312e'; context.lineWidth = 1; context.strokeRect(14.5, 14.5, 571, 246 + extra);
         context.beginPath(); context.moveTo(137.5, 10); context.lineTo(137.5, 265); context.moveTo(462.5, 10); context.lineTo(462.5, 265); context.strokeStyle = '#f4f0df'; context.lineWidth = 2; context.stroke();
         text(context, '剩余价值', 148, 31, `900 15px ${font}`, '#b94b4a');
         text(context, `¥${cny.toFixed(2)}`, 452, 31, `900 16px ${font}`, '#d7bb82', 'right');
@@ -1304,9 +1412,36 @@
           }
         });
 
-        context.beginPath(); context.moveTo(148, 234); context.lineTo(452, 234); context.strokeStyle = '#f4f0df'; context.lineWidth = 2; context.stroke();
-        text(context, '价格预览', 148, 257, `900 14px ${font}`, '#f4f0df');
-        text(context, previewTop, 452, 257, `900 15px ${font}`, previewColor, 'right');
+        // 价格预览和回本周期共用一套版式：方框 + 左侧圆标（¥ / 钟表）+ 标签，值靠中，公式贴右。
+        const tankRow = (rowY, label, value, valueColor, detail) => {
+          const rowHeight = 30;
+          context.fillStyle = 'rgba(0,0,0,.9)'; context.fillRect(145, rowY - 2, 310, rowHeight + 4);
+          context.strokeStyle = '#f4f0df'; context.lineWidth = 1; context.strokeRect(147.5, rowY + .5, 305, rowHeight - 1);
+          context.strokeStyle = '#555'; context.lineWidth = 1; context.strokeRect(150.5, rowY + 3.5, 299, rowHeight - 7);
+          const cx = 165; const cy = rowY + rowHeight / 2;
+          context.beginPath(); context.arc(cx, cy, 9, 0, Math.PI * 2); context.strokeStyle = '#f4f0df'; context.lineWidth = 1; context.stroke();
+          if (label === '价格预览') text(context, '¥', cx, cy + 4, `900 11px ${font}`, '#d7bb82', 'center');
+          else {
+            context.beginPath(); context.moveTo(cx, cy - 4); context.lineTo(cx, cy); context.lineTo(cx + 3.6, cy + 2.2);
+            context.strokeStyle = '#6ac66f'; context.lineWidth = 1.4; context.lineCap = 'round'; context.stroke(); context.lineCap = 'butt';
+          }
+          context.font = `900 11px ${font}`;
+          text(context, label, 178, rowY + 20, `900 11px ${font}`, '#f4f0df');
+          const valueX = 178 + context.measureText(label).width + 9;
+          text(context, value, valueX, rowY + 20, `900 12px ${font}`, valueColor);
+          if (detail) {
+            // 公式贴右；等宽字体在真实环境里偏宽，按剩余空间逐级缩到放得下为止。
+            context.font = `900 12px ${font}`;
+            const valueEnd = valueX + context.measureText(value).width;
+            for (const size of [9, 8, 7]) {
+              context.font = `700 ${size}px ${font}`;
+              const width = context.measureText(detail).width;
+              if (valueEnd + 10 + width <= 446) { text(context, detail, 446, rowY + 19, `700 ${size}px ${font}`, '#d7bb82', 'right'); break; }
+            }
+          }
+        };
+        tankRow(236, '价格预览', previewTop, previewColor, '');
+        if (payback) tankRow(272, '回本周期', payback.result, '#6ac66f', payback.detail);
         canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png');
       };
       background.onerror = () => reject(new Error('卡片背景加载失败'));
@@ -1315,7 +1450,7 @@
     });
   }
 
-  function createValueCard(values, app, rate = activeRate(app)) {
+  function createValueCard(values, app, rate = activeRate(app), payback = null) {
     const result = calculation(values);
     if (!result || !rate) throw new Error('请先填写有效的续费信息并等待汇率加载完成');
     const askingPrice = effectiveAskingPrice(values, rate);
@@ -1323,14 +1458,15 @@
     const style = settings.valueCardStyle;
     if (style === 'custom') {
       if (!settings.customValueCardBackground) throw new Error('请先在个性化配置上传自定义背景');
-      return createCustomValueCard(values, rate, result, askingPrice, settings.customValueCardBackground);
+      return createCustomValueCard(values, rate, result, askingPrice, settings.customValueCardBackground, payback);
     }
-    if (style === 'tank') return createTankValueCard(values, rate, result, askingPrice);
-    if (style !== 'default') return createStardewValueCard(values, rate, result, askingPrice, style);
+    if (style === 'tank') return createTankValueCard(values, rate, result, askingPrice, payback);
+    if (style !== 'default') return createStardewValueCard(values, rate, result, askingPrice, style, payback);
     const cny = result.value * rate.rate;
     const canvas = document.createElement('canvas');
     const cardWidth = 1200;
     const cardHeight = 550;
+    // 默认样式本来就有富余高度，回本周期直接画在底部留白里，不用加高。
     canvas.width = cardWidth; canvas.height = cardHeight;
     const context = canvas.getContext('2d');
     const roundedBox = (x, y, width, height, radius, fill, stroke = '') => {
@@ -1390,14 +1526,30 @@
       else { previewTop = `${(askingPrice / cny * 10).toFixed(1)} 折`; previewBottom = `总价 ¥${askingPrice.toFixed(2)} ÷ 剩余价值 ¥${cny.toFixed(2)}`; previewColor = '#27834a'; }
     }
     roundedBox(592, 264, 576, 238, 20, '#fff', '#dfe7f0');
+    // 图标 + 标签在上、值居中略偏上，公式统一贴右边，和回本周期那条对齐。
+    roundedBox(620, 292, 44, 44, 22, '#fff3d8', '#efd39a');
+    context.fillStyle = '#d9961c'; context.font = `750 26px Georgia`; context.textAlign = 'center';
+    context.fillText('¥', 642, 323); context.textAlign = 'left';
     context.fillStyle = '#52627c'; context.font = `600 22px ${sans}`;
-    context.fillText('价格预览', 620, 305);
-    context.fillStyle = previewColor; context.font = `750 65px ${sans}`;
-    context.fillText(previewTop, 620, 391);
+    context.fillText('价格预览', 680, 322);
+    context.fillStyle = previewColor; context.font = `750 60px ${sans}`;
+    context.fillText(previewTop, 620, 400);
+    context.textAlign = 'right';
     context.fillStyle = '#718096'; context.font = `500 20px ${sans}`;
-    context.fillText(previewBottom, 620, 438);
+    context.fillText(previewBottom, 1140, 400);
+    context.textAlign = 'left';
     context.fillStyle = '#95a3b8'; context.font = `400 18px ${sans}`;
-    context.fillText('价格以人民币计算', 620, 474);
+    context.fillText('价格以人民币计算', 620, 462);
+    if (payback) {
+      // 和上面两个框一样是白底描边的框，左侧钟表圆标，结果用绿色，公式接到右边。
+      drawPaybackBox(context, payback, {
+        x: 32, y: 508, width: 1136, height: 38, baseline: 534, padding: 24, iconWidth: 39,
+        box: (target, boxX, boxY, boxWidth, boxHeight) => roundedBox(target, boxX, boxY, boxWidth, boxHeight, 16, '#fff', '#dfe7f0'),
+        icon: (target, cx, cy) => drawClockBadge(target, cx, cy, 15, { fill: '#fff3d8', line: '#efd39a', hand: '#d9961c' }),
+        labelFont: `600 20px ${sans}`, resultFont: `750 24px ${sans}`, detailFont: `400 18px ${sans}`,
+        labelColor: '#718096', resultColor: '#27834a', detailColor: '#95a3b8',
+      });
+    }
     return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('卡片生成失败')), 'image/png'));
   }
 
@@ -1417,8 +1569,8 @@
     return response.api_key;
   }
 
-  async function uploadValueCard(values, app, rate) {
-    const blob = await createValueCard(values, app, rate);
+  async function uploadValueCard(values, app, rate, payback = null) {
+    const blob = await createValueCard(values, app, rate, payback);
     const upload = async (forceKey = false) => {
       const data = new FormData();
       data.append('image', new File([blob], 'nodeseek-value-card.png', { type: 'image/png' }));
@@ -2226,6 +2378,12 @@
     app.classList.remove('nsit-calc-open');
     app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'true');
     setCalcStatus(app, '');
+  }
+
+  // 计算器里上传图片时借用出鸡那套遮罩 loading，只是挂在计算器弹窗上。
+  function setCalcGenerating(app, generating) {
+    app.classList.toggle('nsit-calc-generating', generating);
+    app.querySelector('.nsit-calc-loading')?.setAttribute('aria-hidden', String(!generating));
   }
 
   function catalogApiUrl(path, params = null) {
