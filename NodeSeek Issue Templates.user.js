@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NodeSeek Issue Templates
 // @namespace    https://www.nodeseek.com/
-// @version      1.4.49
+// @version      1.4.50
 // @description  在 NodeSeek 发帖或编辑帖页面用表单生成交易帖，并回填 Markdown 编辑器。
 // @author       vico
 // @updateURL    https://github.com/ruoqianfengshao/nodeseek-issue-template/releases/latest/download/NodeSeek.Issue.Templates.min.user.js
@@ -353,7 +353,7 @@ function escapeHtml(value) {
           </header>
           <div class="nsit-calc-body">
             <section class="nsit-calc-panel" data-nsit-calc-panel="remaining">
-              <h4>剩余价值</h4>
+              <div class="nsit-calc-panel-head"><h4>剩余价值</h4><button type="button" class="nsit-calc-convert-toggle nsit-calc-convert-entry" data-action="toggle-calc-convert" aria-expanded="false">汇率计算<i class="nsit-calc-chevron" aria-hidden="true"></i></button></div>
               <div class="nsit-value-card nsit-calc-value-card">
                 <div class="nsit-value-inputs nsit-value-row-one">${cycle}<label class="nsit-field"><span>到期日期</span><input name="calcExpiryDate" type="date"></label><label class="nsit-field"><span>交易日期</span><input name="calcTradeDate" type="date" value="${today()}"></label></div>
                 <div class="nsit-value-inputs nsit-value-row-two"><label class="nsit-field nsit-field--renewalAmount"><span>续费金额</span><span class="nsit-amount-input">${calcCurrencyPickerMarkup('calcCurrency', 'USD 美元')}<input name="calcRenewalAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></span></label><label class="nsit-field nsit-field--askingPremium"><span>预出溢价（人民币）</span><input name="calcAskingPremium" type="number" min="0" step="0.01" inputmode="decimal" placeholder="请输入溢价"></label><label class="nsit-field nsit-field--askingPrice"><span>预出总价（人民币）</span><input name="calcAskingPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="一口价"></label></div>
@@ -365,11 +365,13 @@ function escapeHtml(value) {
               <div class="nsit-calc-insert" data-nsit-calc-remaining-insert>—</div>
             </section>
             <section class="nsit-calc-panel" data-nsit-calc-panel="convert">
-              <div class="nsit-calc-panel-head"><h4>汇率计算</h4><button type="button" data-action="refresh-calc-rate" title="刷新今日汇率" aria-label="刷新今日汇率">↻</button></div>
-              <p class="nsit-calc-hint">在任意一行填金额，其他币种按这一行换算。</p>
-              <div class="nsit-calc-rates" data-nsit-calc-rates>${CALC_TARGET_DEFAULTS.map((currency, index) => calcTargetRowMarkup(currency, { removable: index > 0, amount: index === 0 ? CALC_DEFAULT_AMOUNT : '' })).join('')}</div>
-              <button type="button" class="nsit-calc-add" data-action="add-calc-currency">＋ 添加币种</button>
-              <div class="nsit-calc-insert" data-nsit-calc-convert-insert>—</div>
+              <div class="nsit-calc-panel-head"><button type="button" class="nsit-calc-convert-toggle" data-action="toggle-calc-convert" aria-expanded="false"><span>汇率计算</span><i class="nsit-calc-chevron" aria-hidden="true"></i></button><button type="button" data-action="refresh-calc-rate" title="刷新今日汇率" aria-label="刷新今日汇率">↻</button></div>
+              <div class="nsit-calc-convert-body" data-nsit-calc-convert-body>
+                <p class="nsit-calc-hint">在任意一行填金额，其他币种按这一行换算。</p>
+                <div class="nsit-calc-rates" data-nsit-calc-rates>${CALC_TARGET_DEFAULTS.map((currency, index) => calcTargetRowMarkup(currency, { removable: index > 0, amount: index === 0 ? CALC_DEFAULT_AMOUNT : '' })).join('')}</div>
+                <button type="button" class="nsit-calc-add" data-action="add-calc-currency">＋ 添加币种</button>
+                <div class="nsit-calc-insert" data-nsit-calc-convert-insert>—</div>
+              </div>
             </section>
           </div>
           <footer class="nsit-calc-foot"><div class="nsit-calc-foot-cell"><label class="nsit-card-toggle"><input type="checkbox" name="calcGenerateCard" checked>回填图片</label><button type="button" class="nsit-primary" data-action="fill-calc-remaining" disabled>回填剩余价值</button></div><div class="nsit-calc-foot-cell"><button type="button" class="nsit-primary" data-action="fill-calc-convert" disabled>回填对照表</button></div><div class="nsit-calc-status" data-nsit-calc-status role="status"></div></footer>
@@ -810,7 +812,10 @@ function escapeHtml(value) {
     injectStyles(`#${APP_ID} .nsit-trigger.nsit-calc-trigger{border-color:var(--nsit-ok-line);background:var(--nsit-ok-soft);color:var(--nsit-ok-ink)}#${APP_ID} .nsit-trigger.nsit-calc-trigger:hover{border-color:var(--nsit-ok);background:var(--nsit-ok);color:var(--nsit-on-accent)}#${APP_ID} .nsit-calc-modal{display:none;position:fixed;z-index:2147483647;inset:0;overflow:auto;padding:28px 16px;background:var(--nsit-scrim)}#${APP_ID}.nsit-calc-open .nsit-calc-modal{display:grid;place-items:center}#${APP_ID} .nsit-calc-dialog{display:flex;flex-direction:column;width:min(1180px,100%);max-height:calc(100vh - 56px);border:1px solid var(--nsit-line);border-radius:12px;background:var(--nsit-surface);box-shadow:0 20px 60px var(--nsit-shadow-2);overflow:hidden}#${APP_ID} .nsit-calc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 18px;border-bottom:1px solid var(--nsit-line);background:linear-gradient(110deg,var(--nsit-head-from),var(--nsit-accent-soft))}#${APP_ID} .nsit-calc-head-copy{display:flex;align-items:baseline;gap:9px;min-width:0}#${APP_ID} .nsit-calc-head-copy h3{font-size:16px}#${APP_ID} .nsit-calc-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-height:0;overflow:auto}#${APP_ID} .nsit-calc-panel{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px 18px}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-panel h4{margin:0;color:var(--nsit-ink);font-size:15px}#${APP_ID} .nsit-calc-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px}#${APP_ID} .nsit-calc-panel-head button{width:auto;height:auto;margin:0;padding:0;border:0;background:transparent;color:var(--nsit-ok-ink);font-size:16px;line-height:1;cursor:pointer}#${APP_ID} .nsit-calc-hint{margin:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-value-card{margin:0}#${APP_ID} .nsit-calc-value-card .nsit-value-row-two{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr)}#${APP_ID} .nsit-calc-value-card .nsit-value-heading{flex-wrap:wrap;gap:6px 10px}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>span:first-child{white-space:nowrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:3;width:100%;margin-right:0}#${APP_ID} .nsit-calc-value-card .nsit-value-heading>.nsit-rate-value strong{font-size:12px}#${APP_ID} .nsit-calc-value-card .nsit-value-stats strong{font-size:13px}#${APP_ID} .nsit-calc-value-card .nsit-value{font-size:30px}#${APP_ID} .nsit-calc-value-card .nsit-value-result .nsit-price-preview{font-size:15px}#${APP_ID} .nsit-calc-value-card .nsit-price-preview b{font-size:24px}#${APP_ID} .nsit-calc-progress{display:block;flex:none;width:62px;height:6px;overflow:hidden;border-radius:999px;background:var(--nsit-progress-track)}#${APP_ID} .nsit-calc-progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nsit-progress-from),var(--nsit-progress-to));transition:width .15s ease}#${APP_ID} .nsit-calc-rates{display:grid;gap:10px}#${APP_ID} .nsit-calc-rate-row{display:grid;grid-template-columns:24px 132px 166px minmax(0,1fr);align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--nsit-raised)}#${APP_ID} .nsit-calc-rate-row .nsit-picker input{padding:6px 26px 6px 8px;font-size:13px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle{right:5px;width:16px;height:16px}#${APP_ID} .nsit-calc-rate-row .nsit-picker-toggle i{width:14px;height:14px;background-size:14px 14px}#${APP_ID} .nsit-calc-rate-row .nsit-calc-rate-amount{padding:6px 8px;text-align:right;font-size:15px;font-weight:650}#${APP_ID} .nsit-calc-rate-remove{display:grid;place-items:center;width:24px;height:24px;margin:0;padding:0;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--nsit-muted);cursor:pointer}#${APP_ID} .nsit-calc-rate-remove:hover{color:var(--nsit-danger)}#${APP_ID} .nsit-calc-rate-remove svg{width:20px;height:20px;fill:currentColor}#${APP_ID} .nsit-calc-rate-gap{display:block}#${APP_ID} .nsit-calc-rate-line{min-width:0;overflow:hidden;color:var(--nsit-muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap}#${APP_ID} .nsit-calc-add{border-style:dashed;color:var(--nsit-ok-ink)}#${APP_ID} .nsit-calc-insert{padding:8px 10px;border:1px dashed var(--nsit-line-strong);border-radius:8px;background:var(--nsit-sunken);color:var(--nsit-muted-2);font-size:13px;line-height:1.5;word-break:break-all}#${APP_ID} .nsit-calc-foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-top:1px solid var(--nsit-line);background:var(--nsit-surface);box-shadow:0 -8px 18px var(--nsit-shadow-soft-6)}#${APP_ID} .nsit-calc-foot-cell{display:flex;justify-content:flex-end;padding:12px 18px}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-left:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-status{grid-column:1/-1;padding:0 18px;color:var(--nsit-muted);font-size:13px;text-align:right}#${APP_ID} .nsit-calc-status:empty{display:none}#${APP_ID} .nsit-calc-status:not(:empty){padding-bottom:12px}@media(max-width:1080px){#${APP_ID} .nsit-calc-body{grid-template-columns:1fr}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-top:1px solid var(--nsit-line);border-left:0}#${APP_ID} .nsit-calc-foot{grid-template-columns:1fr}#${APP_ID} .nsit-calc-foot-cell+.nsit-calc-foot-cell{border-top:1px solid var(--nsit-line);border-left:0}}`);
     // 剩余价值的回填预览是多行文本，保留换行。
     // 实时汇率挪到「剩余价值」标题旁（压过上面对应的「独占一行」规则），并补上回本那一行。
-    injectStyles(`#${APP_ID} .nsit-calc-insert{white-space:pre-wrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:0;width:auto;margin-right:auto}#${APP_ID} .nsit-calc-value-card .nsit-value small{font-size:20px}#${APP_ID} .nsit-calc-value-card .nsit-value-result{margin-top:6px;padding-bottom:10px}#${APP_ID} .nsit-calc-modal input:disabled{background:var(--nsit-sunken);color:var(--nsit-faint);cursor:not-allowed}#${APP_ID} .nsit-calc-payback-fields{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);padding-top:10px;border-top:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-payback-result{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;margin-top:8px}#${APP_ID} .nsit-calc-payback-result b{flex:none;color:var(--nsit-accent);font-size:18px;font-weight:750;line-height:1.2}#${APP_ID} .nsit-calc-payback-result[data-state="done"] b{color:var(--nsit-ok)}#${APP_ID} .nsit-calc-payback-result small{min-width:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-foot-cell{gap:10px}#${APP_ID} .nsit-calc-foot-cell .nsit-card-toggle{font-size:13px}#${APP_ID} .nsit-calc-dialog{position:relative}#${APP_ID}.nsit-calc-generating .nsit-calc-loading{display:grid}`);
+    // 汇率计算收起时底部只剩剩余价值那一格，对照表的回填按钮跟着面板一起收进去。
+    injectStyles(`#${APP_ID} .nsit-calc-dialog:not([data-nsit-convert="open"]) .nsit-calc-foot{grid-template-columns:1fr}#${APP_ID} .nsit-calc-dialog:not([data-nsit-convert="open"]) .nsit-calc-foot-cell:has([data-action="fill-calc-convert"]){display:none}`);
+    // 汇率计算默认收起来、弹窗改成靠右停靠，展开时才恢复两栏宽度（压过上面居中和 1180px 那套）。
+    injectStyles(`#${APP_ID} .nsit-calc-insert{white-space:pre-wrap}#${APP_ID} .nsit-calc-value-card .nsit-rate-value{order:0;width:auto;margin-right:auto}#${APP_ID} .nsit-calc-value-card .nsit-value small{font-size:20px}#${APP_ID} .nsit-calc-value-card .nsit-value-result{margin-top:6px;padding-bottom:10px}#${APP_ID} .nsit-calc-modal input:disabled{background:var(--nsit-sunken);color:var(--nsit-faint);cursor:not-allowed}#${APP_ID} .nsit-calc-payback-fields{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);padding-top:10px;border-top:1px solid var(--nsit-line)}#${APP_ID} .nsit-calc-payback-result{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;margin-top:8px}#${APP_ID} .nsit-calc-payback-result b{flex:none;color:var(--nsit-accent);font-size:18px;font-weight:750;line-height:1.2}#${APP_ID} .nsit-calc-payback-result[data-state="done"] b{color:var(--nsit-ok)}#${APP_ID} .nsit-calc-payback-result small{min-width:0;color:var(--nsit-muted);font-size:12px}#${APP_ID} .nsit-calc-foot-cell{gap:10px}#${APP_ID} .nsit-calc-foot-cell .nsit-card-toggle{font-size:13px}#${APP_ID} .nsit-calc-dialog{position:relative}#${APP_ID}.nsit-calc-generating .nsit-calc-loading{display:grid}#${APP_ID}.nsit-calc-open .nsit-calc-modal{place-items:center end}#${APP_ID} .nsit-calc-dialog{width:min(620px,100%)}#${APP_ID} .nsit-calc-body{grid-template-columns:1fr}#${APP_ID} .nsit-calc-panel+.nsit-calc-panel{border-top:1px solid var(--nsit-line);border-left:0}#${APP_ID} .nsit-calc-convert-body{display:grid;gap:12px;min-width:0}#${APP_ID} .nsit-calc-panel-head .nsit-calc-convert-toggle{display:inline-flex;align-items:center;gap:7px;color:var(--nsit-ink);font-size:15px;font-weight:600}#${APP_ID} .nsit-calc-panel-head .nsit-calc-convert-entry{gap:6px;padding:3px 8px;border:1px solid var(--nsit-info-line-3);border-radius:6px;background:var(--nsit-info-soft);color:var(--nsit-info-ink);font-size:13px;line-height:1.5}#${APP_ID} .nsit-calc-panel-head .nsit-calc-convert-entry:hover{border-color:var(--nsit-info-ink);background:var(--nsit-info);color:var(--nsit-on-info)}#${APP_ID} .nsit-calc-chevron{display:block;width:7px;height:7px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(-45deg);transition:transform .15s ease}#${APP_ID} .nsit-calc-dialog[data-nsit-convert="open"] .nsit-calc-chevron{transform:rotate(135deg)}#${APP_ID} .nsit-calc-dialog[data-nsit-convert="open"] .nsit-calc-convert-entry{display:none}#${APP_ID} .nsit-calc-dialog:not([data-nsit-convert="open"]) .nsit-calc-panel[data-nsit-calc-panel="convert"]{display:none}@media(min-width:1081px){#${APP_ID} .nsit-calc-dialog[data-nsit-convert="open"]{width:min(1180px,100%)}#${APP_ID} .nsit-calc-dialog[data-nsit-convert="open"] .nsit-calc-body{grid-template-columns:repeat(2,minmax(0,1fr))}#${APP_ID} .nsit-calc-dialog[data-nsit-convert="open"] .nsit-calc-panel+.nsit-calc-panel{border-top:0;border-left:1px solid var(--nsit-line)}}`);
     app.innerHTML = `
       <button type="button" class="nsit-trigger" aria-haspopup="dialog">出🐔模板</button>
       ${replyMode ? '<button type="button" class="nsit-trigger nsit-calc-trigger" aria-haspopup="dialog">剩余价值计算</button>' : ''}
@@ -3368,8 +3373,19 @@ function formValues(app) {
     app.querySelector('.nsit-modal').setAttribute('aria-hidden', 'true');
   }
 
+  // 汇率计算默认收起来（只留标题那一行），点标题展开；展开时宽屏下弹窗变回两栏。
+  function setCalcConvertOpen(app, open) {
+    const dialog = app.querySelector('.nsit-calc-dialog');
+    if (dialog) {
+      if (open) dialog.dataset.nsitConvert = 'open';
+      else delete dialog.dataset.nsitConvert;
+    }
+    app.querySelectorAll('[data-action="toggle-calc-convert"]').forEach((toggle) => toggle.setAttribute('aria-expanded', String(open)));
+  }
+
   function openCalcModal(app) {
     setCalcStatus(app, '');
+    setCalcConvertOpen(app, false);
     app.classList.add('nsit-calc-open');
     app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'false');
     ensureRateTable(app);
@@ -6696,6 +6712,10 @@ function replyEditor() {
       }
       if (action === 'close-calc') {
         closeCalcModal(app);
+        return;
+      }
+      if (action === 'toggle-calc-convert') {
+        setCalcConvertOpen(app, app.querySelector('.nsit-calc-dialog')?.dataset.nsitConvert !== 'open');
         return;
       }
       if (action === 'fill-calc-remaining') {

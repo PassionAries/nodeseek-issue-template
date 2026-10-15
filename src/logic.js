@@ -2367,8 +2367,19 @@
     app.querySelector('.nsit-modal').setAttribute('aria-hidden', 'true');
   }
 
+  // 汇率计算默认收起来（只留标题那一行），点标题展开；展开时宽屏下弹窗变回两栏。
+  function setCalcConvertOpen(app, open) {
+    const dialog = app.querySelector('.nsit-calc-dialog');
+    if (dialog) {
+      if (open) dialog.dataset.nsitConvert = 'open';
+      else delete dialog.dataset.nsitConvert;
+    }
+    app.querySelectorAll('[data-action="toggle-calc-convert"]').forEach((toggle) => toggle.setAttribute('aria-expanded', String(open)));
+  }
+
   function openCalcModal(app) {
     setCalcStatus(app, '');
+    setCalcConvertOpen(app, false);
     app.classList.add('nsit-calc-open');
     app.querySelector('.nsit-calc-modal')?.setAttribute('aria-hidden', 'false');
     ensureRateTable(app);

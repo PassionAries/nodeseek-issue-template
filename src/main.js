@@ -468,6 +468,10 @@
         closeCalcModal(app);
         return;
       }
+      if (action === 'toggle-calc-convert') {
+        setCalcConvertOpen(app, app.querySelector('.nsit-calc-dialog')?.dataset.nsitConvert !== 'open');
+        return;
+      }
       if (action === 'fill-calc-remaining') {
         fillCalcRemaining(app);
         return;
