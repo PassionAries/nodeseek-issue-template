@@ -1777,17 +1777,15 @@ function formValues(app) {
     return Number.isFinite(base.amount) ? base.amount / perDay : NaN;
   }
 
-  // 回本要赚回来的那笔钱：有剩余价值时用「预出价 − 剩余价值」（也就是溢价）；
-  // 剩余价值算不出来时（比如没填到期日期），就直接用填的预出总价，没填总价就用预出溢价。
+  // 回本要赚回来的那笔钱：有预出总价就用总价，只填了溢价就用「溢价 + 剩余价值」折成总价；
+  // 剩余价值算不出来时（比如没填到期日期），退回用填的预出溢价。
   function paybackBase(state) {
     const { values, remaining } = state;
-    if (Number.isFinite(remaining) && remaining > 0) {
-      const asking = effectiveCalcAskingPrice(values, remaining);
-      return { amount: Number.isFinite(asking) ? asking - remaining : NaN, label: '溢价' };
-    }
     const askingPrice = parsePrice(values.askingPrice);
     if (Number.isFinite(askingPrice)) return { amount: askingPrice, label: '总价' };
-    return { amount: parsePrice(values.askingPremium), label: '溢价' };
+    const premium = parsePrice(values.askingPremium);
+    if (Number.isFinite(premium) && Number.isFinite(remaining)) return { amount: premium + remaining, label: '总价' };
+    return { amount: premium, label: '溢价' };
   }
 
   // 回本周期不按天报：不足一年按月，超过一年按年。
@@ -1805,7 +1803,7 @@ function formValues(app) {
     const days = paybackDays(state, perDay);
     if (!Number.isFinite(days)) return { verdict: `回本价 ¥${price.toFixed(2)}`, detail: `${costText} · 填预出价格后可看回本` };
     const base = paybackBase(state);
-    if (days <= 0) return { verdict: '不用回本', detail: `${costText} · 预出价没高过剩余价值`, tone: 'done' };
+    if (days <= 0) return { verdict: '不用回本', detail: `${costText} · 预出价是 0`, tone: 'done' };
     return { verdict: `约 ${paybackDurationText(days)}回本`, detail: `${base.label} ¥${base.amount.toFixed(2)} ÷ ${costText}` };
   }
 
