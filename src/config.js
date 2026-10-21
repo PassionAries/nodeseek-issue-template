@@ -139,7 +139,8 @@
   const LUCKY_POST_ID_PLACEHOLDER = '__POST_ID__';
   const LUCKY_SUBMIT_WINDOW = 10 * 60 * 1000;
   const LUCKY_REPLY_OPTIONS = [['any', '任意回复'], ['contains', '包含回复'], ['exact', '固定回复']];
-  const LUCKY_INTERACTION_OPTIONS = [['like', '点赞'], ['chicken', '鸡腿']];
+  // 互动条件只保留点赞：版规明确允许抽奖贴要点赞，不允许要鸡腿。
+  const LUCKY_INTERACTION_OPTIONS = [['like', '点赞']];
   const LUCKY_POSITION_OPTIONS = [['end', '正文末尾'], ['start', '正文开头']];
   const LUCKY_RECORDS_KEY = 'nsit-lucky-records-v1';
   const LUCKY_NOTIFY_RUNTIME_KEY = '__nodeSeekIssueTemplatesLuckyNotify__';

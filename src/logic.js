@@ -3556,7 +3556,6 @@
   function luckyInteractionText(config) {
     const parts = [];
     if (config.interactions.includes('like')) parts.push('点赞本帖');
-    if (config.interactions.includes('chicken')) parts.push('给本帖加鸡腿');
     return parts.join('、');
   }
 

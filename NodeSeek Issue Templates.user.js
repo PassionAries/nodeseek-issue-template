@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NodeSeek Issue Templates
 // @namespace    https://www.nodeseek.com/
-// @version      1.4.50
+// @version      1.4.51
 // @description  在 NodeSeek 发帖或编辑帖页面用表单生成交易帖，并回填 Markdown 编辑器。
 // @author       vico
 // @updateURL    https://github.com/ruoqianfengshao/nodeseek-issue-template/releases/latest/download/NodeSeek.Issue.Templates.min.user.js
@@ -162,7 +162,8 @@ const APP_ID = 'nsit-app';
   const LUCKY_POST_ID_PLACEHOLDER = '__POST_ID__';
   const LUCKY_SUBMIT_WINDOW = 10 * 60 * 1000;
   const LUCKY_REPLY_OPTIONS = [['any', '任意回复'], ['contains', '包含回复'], ['exact', '固定回复']];
-  const LUCKY_INTERACTION_OPTIONS = [['like', '点赞'], ['chicken', '鸡腿']];
+  // 互动条件只保留点赞：版规明确允许抽奖贴要点赞，不允许要鸡腿。
+  const LUCKY_INTERACTION_OPTIONS = [['like', '点赞']];
   const LUCKY_POSITION_OPTIONS = [['end', '正文末尾'], ['start', '正文开头']];
   const LUCKY_RECORDS_KEY = 'nsit-lucky-records-v1';
   const LUCKY_NOTIFY_RUNTIME_KEY = '__nodeSeekIssueTemplatesLuckyNotify__';
@@ -893,8 +894,8 @@ function escapeHtml(value) {
           <section class="nsit-lucky-section">
             <h4>参与方式</h4>
             <div class="nsit-lucky-group"><span class="nsit-lucky-group-label">回复内容</span><div class="nsit-lucky-options">${reply}</div><input class="nsit-lucky-extra" data-nsit-lucky-reply-text placeholder="回复需要包含的文字" hidden></div>
-            <div class="nsit-lucky-group"><span class="nsit-lucky-group-label">互动（与回复是且的关系）</span><div class="nsit-lucky-options">${interactions}</div></div>
-            <p class="nsit-lucky-hint">NodeSeek 的抽奖工具仅按楼层计算，点赞、鸡腿和回复内容只能写进说明，需要自行核对</p>
+            <div class="nsit-lucky-group"><span class="nsit-lucky-group-label">互动（与回复是且的关系）</span><div class="nsit-lucky-options">${interactions}<span class="nsit-lucky-interaction-note"><a href="https://www.nodeseek.com/post-815077-1" target="_blank" rel="noopener noreferrer">版规明确允许抽奖贴要点赞，不允许要鸡腿</a></span></div></div>
+            <p class="nsit-lucky-hint">NodeSeek 的抽奖工具仅按楼层计算，点赞和回复内容只能写进说明，需要自行核对</p>
             <label class="nsit-lucky-option nsit-lucky-fallback" hidden><input type="checkbox" data-nsit-lucky-fallback checked><span>不满足条件时顺延至下一位</span></label>
           </section>
           </div>
@@ -976,6 +977,9 @@ function escapeHtml(value) {
       .nsit-lucky-extra{margin-top:7px}
       .nsit-lucky-dedupe{margin-top:10px}
       .nsit-lucky-fallback{margin-top:10px}
+      .nsit-lucky-interaction-note{align-self:center;color:var(--nsit-muted);font-size:12px;line-height:1.5}
+      .nsit-lucky-interaction-note a{color:var(--nsit-info-ink);text-decoration:underline;text-underline-offset:2px}
+      .nsit-lucky-interaction-note a:hover{color:var(--nsit-info)}
       .nsit-lucky-hint{margin:8px 0 0;color:var(--nsit-muted);font-size:12px;line-height:1.6}
       .nsit-lucky-preview{margin:0;padding:10px 12px;border:1px solid var(--nsit-line-soft-4);border-radius:8px;background:var(--nsit-surface);color:var(--nsit-ink-soft-4);font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
       .nsit-lucky-preview-panel .nsit-lucky-hint{margin-top:8px}
@@ -4562,7 +4566,6 @@ function formValues(app) {
   function luckyInteractionText(config) {
     const parts = [];
     if (config.interactions.includes('like')) parts.push('点赞本帖');
-    if (config.interactions.includes('chicken')) parts.push('给本帖加鸡腿');
     return parts.join('、');
   }
 
