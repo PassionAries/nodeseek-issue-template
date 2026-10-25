@@ -232,10 +232,12 @@
   function openPersonalization(app) {
     app.querySelector('[data-nsit-personalization-body]').innerHTML = personalizationDialogMarkup();
     app.classList.add('nsit-personalization-open');
+    app.querySelector('.nsit-personalization-modal:not(.nsit-flag-modal)')?.setAttribute('aria-hidden', 'false');
   }
 
   function closePersonalization(app) {
     app.classList.remove('nsit-personalization-open');
+    app.querySelector('.nsit-personalization-modal:not(.nsit-flag-modal)')?.setAttribute('aria-hidden', 'true');
   }
 
   function savePersonalizationForm(app) {
